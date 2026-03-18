@@ -20,17 +20,17 @@ function defaultChildVmConfig() {
   };
 }
 
-export function defaultRootDna() {
+export function defaultSharedOperationalDna() {
   return {
-    organs: ["bootloader", "docs", "installer", "lieutenant", "registry", "services", "ui", "vers-config", "vm-tree"],
-    capabilities: ["pi-vers", "punkin", "reef-root", "root-lineage", "vers-fleets"],
+    organs: ["bootloader", "cron", "docs", "installer", "lieutenant", "services", "ui", "vers-config"],
+    capabilities: ["pi-vers", "punkin", "reef-node", "vers-fleets"],
   };
 }
 
-export function defaultChildDna() {
+export function defaultRootAuthorityOverlayDna() {
   return {
-    organs: ["bootloader", "docs", "services", "ui", "vers-config"],
-    capabilities: ["punkin", "reef-node", "vers-fleets"],
+    organs: ["registry", "store", "vm-tree"],
+    capabilities: ["reef-root", "root-lineage", "sqlite-authority"],
   };
 }
 
@@ -124,6 +124,7 @@ function makeRecord({
       harness,
       reefRole,
       hasSqliteAuthority,
+      profile: hasSqliteAuthority ? "root-with-authority-overlay" : "shared-operational",
     },
   };
 }
@@ -194,9 +195,15 @@ export function validateSpec(input = {}) {
   const rootVmConfig = normalizeVmConfig(input.rootVmConfig, "rootVmConfig", defaultRootVmConfig());
   const childVmConfig = normalizeVmConfig(input.childVmConfig, "childVmConfig", defaultChildVmConfig());
 
+  const sharedExtraDna = input.sharedExtraDna || {};
+  const rootAuthorityExtraDna = input.rootAuthorityExtraDna || {};
   const rootExtraDna = input.rootExtraDna || {};
   const lieutenantExtraDna = input.lieutenantExtraDna || {};
   const swarmExtraDna = input.swarmExtraDna || {};
+  if (sharedExtraDna.organs) ensureStringArray(sharedExtraDna.organs, "sharedExtraDna.organs");
+  if (sharedExtraDna.capabilities) ensureStringArray(sharedExtraDna.capabilities, "sharedExtraDna.capabilities");
+  if (rootAuthorityExtraDna.organs) ensureStringArray(rootAuthorityExtraDna.organs, "rootAuthorityExtraDna.organs");
+  if (rootAuthorityExtraDna.capabilities) ensureStringArray(rootAuthorityExtraDna.capabilities, "rootAuthorityExtraDna.capabilities");
   if (rootExtraDna.organs) ensureStringArray(rootExtraDna.organs, "rootExtraDna.organs");
   if (rootExtraDna.capabilities) ensureStringArray(rootExtraDna.capabilities, "rootExtraDna.capabilities");
   if (lieutenantExtraDna.organs) ensureStringArray(lieutenantExtraDna.organs, "lieutenantExtraDna.organs");
@@ -218,6 +225,8 @@ export function validateSpec(input = {}) {
     versKeyEnv,
     authTokenEnv,
     infraUrlEnv,
+    sharedExtraDna,
+    rootAuthorityExtraDna,
     rootExtraDna,
     lieutenantExtraDna,
     swarmExtraDna,
@@ -232,11 +241,15 @@ export function buildTopology(input = {}) {
   const swarmVmIds =
     spec.swarmVmIds.length > 0 ? spec.swarmVmIds : Array.from({ length: spec.swarmCount }, () => buildVmId("swarm"));
 
+  const sharedOperationalProfile = mergeDna(defaultSharedOperationalDna(), spec.sharedExtraDna);
+  const rootAuthorityOverlay = mergeDna(defaultRootAuthorityOverlayDna(), spec.rootAuthorityExtraDna);
+  const rootBaseProfile = mergeDna(sharedOperationalProfile, rootAuthorityOverlay);
+
   const root = makeRecord({
     vmId: rootVmId,
     name: spec.rootName,
     category: DEFAULT_ROOT_CATEGORY,
-    reefConfig: mergeDna(defaultRootDna(), spec.rootExtraDna),
+    reefConfig: mergeDna(rootBaseProfile, spec.rootExtraDna),
     hasSqliteAuthority: true,
     harness: "punkin",
     reefRole: "root",
@@ -248,7 +261,7 @@ export function buildTopology(input = {}) {
     name: spec.lieutenantName,
     parentVmId: rootVmId,
     category: DEFAULT_LIEUTENANT_CATEGORY,
-    reefConfig: mergeDna(defaultChildDna(), spec.lieutenantExtraDna),
+    reefConfig: mergeDna(sharedOperationalProfile, spec.lieutenantExtraDna),
     hasSqliteAuthority: false,
     harness: "punkin",
     reefRole: "child",
@@ -261,7 +274,7 @@ export function buildTopology(input = {}) {
       name: `swarm-${index + 1}`,
       parentVmId: lieutenantVmId,
       category: DEFAULT_SWARM_CATEGORY,
-      reefConfig: mergeDna(defaultChildDna(), spec.swarmExtraDna),
+      reefConfig: mergeDna(sharedOperationalProfile, spec.swarmExtraDna),
       hasSqliteAuthority: false,
       harness: "punkin",
       reefRole: "child",
@@ -276,6 +289,11 @@ export function buildTopology(input = {}) {
       snapshotsInBootstrap: false,
       rootOwnsSqlite: true,
       childVmMayBecomeParentLater: true,
+    },
+    profiles: {
+      sharedOperational: sharedOperationalProfile,
+      rootAuthorityOverlay,
+      inheritanceRule: "lieutenant and swarm inherit the shared operational profile; only the root applies the authority overlay",
     },
     sources: spec.sources,
     env: {

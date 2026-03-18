@@ -15,14 +15,24 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.semantics.rootOwnsSqlite, true);
   assert.equal(topology.sources.punkin.ref, "v1rc3");
   assert.equal(topology.sources.punkin.type, "workspace");
+  assert.equal(topology.profiles.sharedOperational.capabilities.includes("pi-vers"), true);
+  assert.equal(topology.profiles.sharedOperational.capabilities.includes("punkin"), true);
+  assert.equal(topology.profiles.rootAuthorityOverlay.capabilities.includes("sqlite-authority"), true);
   assert.equal(topology.root.runtime.hasSqliteAuthority, true);
   assert.equal(topology.lieutenant.runtime.hasSqliteAuthority, false);
   assert.equal(topology.swarm[0].runtime.hasSqliteAuthority, false);
+  assert.equal(topology.root.runtime.profile, "root-with-authority-overlay");
+  assert.equal(topology.lieutenant.runtime.profile, "shared-operational");
   assert.equal(topology.lieutenant.parentVmId, topology.root.vmId);
   assert.equal(topology.swarm[0].parentVmId, topology.lieutenant.vmId);
   assert.equal(topology.lieutenant.reefConfig.organs.includes("registry"), false);
   assert.equal(topology.lieutenant.reefConfig.organs.includes("vm-tree"), false);
   assert.equal(topology.lieutenant.reefConfig.organs.includes("store"), false);
+  assert.equal(topology.lieutenant.reefConfig.organs.includes("lieutenant"), true);
+  assert.deepEqual(topology.lieutenant.reefConfig, topology.swarm[0].reefConfig);
+  assert.equal(topology.root.reefConfig.organs.includes("registry"), true);
+  assert.equal(topology.root.reefConfig.organs.includes("vm-tree"), true);
+  assert.equal(topology.root.reefConfig.organs.includes("store"), true);
 });
 
 test("buildBootstrapBundle emits workspace-aware root and child scripts", () => {
