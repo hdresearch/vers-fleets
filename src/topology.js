@@ -185,7 +185,7 @@ export function validateSpec(input = {}) {
       ref: null,
     }),
     punkin: normalizeSource("sources.punkin", input.sources?.punkin, {
-      type: "workspace",
+      type: "git",
       repoPath: "../punkin-pi",
       repoUrl: "https://github.com/hdresearch/punkin-pi.git",
       ref: "v1rc3",

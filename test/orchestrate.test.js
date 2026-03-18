@@ -7,6 +7,7 @@ test("provisionFleet creates fresh VMs, bootstraps them, and registers lineage a
   const staged = [];
   const bootstrapped = [];
   const registered = [];
+  const lieutenantRegistrations = [];
   let count = 0;
 
   const deployment = await provisionFleet(
@@ -44,6 +45,13 @@ test("provisionFleet creates fresh VMs, bootstraps them, and registers lineage a
           })),
         });
       },
+      registerLieutenant: async (topology) => {
+        lieutenantRegistrations.push({
+          name: topology.lieutenant.name,
+          vmId: topology.lieutenant.vmId,
+          parentVmId: topology.lieutenant.parentVmId,
+        });
+      },
     },
   );
 
@@ -62,6 +70,13 @@ test("provisionFleet creates fresh VMs, bootstraps them, and registers lineage a
     registered[1].nodes.map((node) => node.parentVmId),
     ["vm-1", "vm-2", "vm-2"],
   );
+  assert.deepEqual(lieutenantRegistrations, [
+    {
+      name: "lt-main",
+      vmId: "vm-2",
+      parentVmId: "vm-1",
+    },
+  ]);
   assert.match(bootstrapped[0].script, /bootstrapping reef-root/);
   assert.match(bootstrapped[1].script, /bootstrapping lt-main/);
 });

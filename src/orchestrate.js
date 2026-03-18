@@ -211,6 +211,16 @@ async function registerChildFleetRecords(topology, authToken, fetchImpl = fetch)
   }
 }
 
+async function registerLieutenantControlPlane(topology, authToken, fetchImpl = fetch) {
+  const rootBaseUrl = publicVmUrl(topology.root.vmId);
+  await apiRequest(rootBaseUrl, authToken, "POST", "/lieutenant/lieutenants/register", {
+    name: topology.lieutenant.name,
+    role: "remote reef lieutenant",
+    vmId: topology.lieutenant.vmId,
+    parentAgent: topology.root.name,
+  }, fetchImpl);
+}
+
 function writeDeployment(outDir, deployment) {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, "deployment.json"), `${JSON.stringify(deployment, null, 2)}\n`);
@@ -258,6 +268,8 @@ export async function provisionFleet(input = {}, options = {}) {
   const registerRoot = options.registerRoot || ((fleetTopology) => registerRootFleetRecords(fleetTopology, authToken, fetchImpl));
   const registerChildren =
     options.registerChildren || ((fleetTopology) => registerChildFleetRecords(fleetTopology, authToken, fetchImpl));
+  const registerLieutenant =
+    options.registerLieutenant || ((fleetTopology) => registerLieutenantControlPlane(fleetTopology, authToken, fetchImpl));
 
   const nodes = [
     { vmId: topology.root.vmId, script: bundle.scripts.root },
@@ -272,6 +284,7 @@ export async function provisionFleet(input = {}, options = {}) {
 
   await registerRoot(topology);
   await registerChildren(topology);
+  await registerLieutenant(topology);
 
   const deployment = {
     topology,

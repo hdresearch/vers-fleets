@@ -51,13 +51,13 @@ This is intentionally flexible so child VMs can become parents later.
 This repo now does both:
 
 - `bundle`: generate the topology and per-VM bootstrap scripts
-- `provision`: run Vers shell-auth if needed, create fresh VMs, stage local `reef` and `pi-vers`, pin `punkin-pi` to `v1rc3`, bootstrap reef on each VM, and register lineage in the root reef
+- `provision`: run Vers shell-auth if needed, create fresh VMs, stage local `reef` and `pi-vers`, clone public `punkin-pi` at `v1rc3`, bootstrap reef on each VM, and register lineage in the root reef
 
 Default source strategy:
 
 - `reef`: local workspace upload
 - `pi-vers`: local workspace upload
-- `punkin-pi`: local workspace upload pinned to tag `v1rc3`
+- `punkin-pi`: public git source pinned to tag `v1rc3`
 
 The provisioning path in this repo now calls into `pi-vers` for shell-auth and Vers VM transport instead of carrying a separate duplicate implementation.
 

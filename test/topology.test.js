@@ -14,7 +14,7 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.semantics.snapshotsInBootstrap, false);
   assert.equal(topology.semantics.rootOwnsSqlite, true);
   assert.equal(topology.sources.punkin.ref, "v1rc3");
-  assert.equal(topology.sources.punkin.type, "workspace");
+  assert.equal(topology.sources.punkin.type, "git");
   assert.equal(topology.profiles.sharedOperational.capabilities.includes("pi-vers"), true);
   assert.equal(topology.profiles.sharedOperational.capabilities.includes("punkin"), true);
   assert.equal(topology.profiles.rootAuthorityOverlay.capabilities.includes("sqlite-authority"), true);
@@ -35,7 +35,7 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.root.reefConfig.organs.includes("store"), true);
 });
 
-test("buildBootstrapBundle emits workspace-aware root and child scripts", () => {
+test("buildBootstrapBundle emits workspace-aware root and public punkin bootstrap scripts", () => {
   const bundle = buildBootstrapBundle({
     rootName: "reef-root",
     lieutenantName: "lt-main",
@@ -43,7 +43,8 @@ test("buildBootstrapBundle emits workspace-aware root and child scripts", () => 
   });
 
   assert.match(bundle.scripts.root, /expected staged workspace source at \/opt\/src\/reef/);
-  assert.match(bundle.scripts.root, /expected staged workspace source at \/opt\/src\/punkin-pi/);
+  assert.match(bundle.scripts.root, /git clone 'https:\/\/github.com\/hdresearch\/punkin-pi\.git' '\/opt\/src\/punkin-pi'/);
+  assert.match(bundle.scripts.root, /git checkout 'v1rc3'/);
   assert.match(bundle.scripts.root, /setup_22\.x/);
   assert.match(bundle.scripts.root, /HUSKY=0 npm install/);
   assert.match(bundle.scripts.root, /SERVICES_DIR="\/opt\/reef\/services-active"/);
