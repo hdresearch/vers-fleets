@@ -245,7 +245,12 @@ export async function provisionFleet(input = {}, options = {}) {
       lieutenantVmId: topology.lieutenant.vmId,
       swarmVmIds: topology.swarm.map((vm) => vm.vmId),
     },
-    { rootUrl },
+    {
+      rootUrl,
+      versApiKey: auth.apiKey,
+      versAuthToken: authToken,
+      anthropicApiKey: process.env[spec.anthroKeyEnv] || "",
+    },
   );
 
   const stageSources = options.stageSources || defaultStageSources;

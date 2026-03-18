@@ -22,10 +22,19 @@ function buildRuntimeEnv(vm, topology, options = {}) {
     VERS_VM_ID: vm.vmId,
     VERS_AGENT_NAME: vm.name,
     VERS_AGENT_ROLE: vm.category,
-    VERS_API_KEY: `\${${topology.env.versApiKeyEnv}:-}`,
-    VERS_AUTH_TOKEN: `\${${topology.env.versAuthTokenEnv}:-}`,
+    VERS_API_KEY:
+      options.versApiKey && String(options.versApiKey).trim()
+        ? shellQuote(options.versApiKey)
+        : `\${${topology.env.versApiKeyEnv}:-}`,
+    VERS_AUTH_TOKEN:
+      options.versAuthToken && String(options.versAuthToken).trim()
+        ? shellQuote(options.versAuthToken)
+        : `\${${topology.env.versAuthTokenEnv}:-}`,
     VERS_INFRA_URL: shellQuote(rootUrl),
-    ANTHROPIC_API_KEY: `\${${topology.env.anthropicApiKeyEnv}:-}`,
+    ANTHROPIC_API_KEY:
+      options.anthropicApiKey && String(options.anthropicApiKey).trim()
+        ? shellQuote(options.anthropicApiKey)
+        : `\${${topology.env.anthropicApiKeyEnv}:-}`,
     REEF_ROLE: vm.runtime.reefRole,
     REEF_CATEGORY: vm.category,
     REEF_PARENT_VM_ID: vm.parentVmId || "",
@@ -124,7 +133,7 @@ ln -sfn /opt/src/pi-vers /opt/pi-vers
 ln -sfn /opt/src/punkin-pi /opt/punkin-pi
 
 cd /opt/punkin-pi
-npm install
+HUSKY=0 npm install
 npm run build
 
 cd /opt/pi-vers

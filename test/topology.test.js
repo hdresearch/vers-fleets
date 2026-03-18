@@ -45,8 +45,29 @@ test("buildBootstrapBundle emits workspace-aware root and child scripts", () => 
   assert.match(bundle.scripts.root, /expected staged workspace source at \/opt\/src\/reef/);
   assert.match(bundle.scripts.root, /expected staged workspace source at \/opt\/src\/punkin-pi/);
   assert.match(bundle.scripts.root, /setup_22\.x/);
+  assert.match(bundle.scripts.root, /HUSKY=0 npm install/);
   assert.match(bundle.scripts.root, /SERVICES_DIR="\/opt\/reef\/services-active"/);
   assert.match(bundle.scripts.root, /PUNKIN_RELEASE_TAG='v1rc3'/);
   assert.doesNotMatch(bundle.scripts.lieutenant, /root\.sqlite/);
   assert.match(bundle.scripts.lieutenant, /VERS_INFRA_URL='https:\/\/.*\.vm\.vers\.sh:3000'/);
+});
+
+test("buildBootstrapBundle can inline runtime secrets for remote bootstrap", () => {
+  const bundle = buildBootstrapBundle(
+    {
+      rootName: "reef-root",
+      lieutenantName: "lt-main",
+      swarmCount: 1,
+    },
+    {
+      rootUrl: "https://infra.vm.vers.sh:3000",
+      versApiKey: "vers-secret",
+      versAuthToken: "auth-secret",
+      anthropicApiKey: "anthropic-secret",
+    },
+  );
+
+  assert.match(bundle.scripts.root, /VERS_API_KEY='vers-secret'/);
+  assert.match(bundle.scripts.root, /VERS_AUTH_TOKEN='auth-secret'/);
+  assert.match(bundle.scripts.root, /ANTHROPIC_API_KEY='anthropic-secret'/);
 });
