@@ -22,14 +22,14 @@ function defaultChildVmConfig() {
 
 export function defaultSharedOperationalDna() {
   return {
-    organs: ["bootloader", "cron", "docs", "installer", "lieutenant", "services", "ui", "vers-config"],
-    capabilities: ["pi-vers", "punkin", "reef-node", "vers-fleets"],
+    services: ["bootloader", "cron", "docs", "installer", "lieutenant", "services", "ui", "vers-config"],
+    capabilities: ["pi-vers", "punkin", "reef-extension", "vers-fleets"],
   };
 }
 
 export function defaultRootAuthorityOverlayDna() {
   return {
-    organs: ["commits", "registry", "store", "vm-tree"],
+    services: ["commits", "registry", "store", "vm-tree"],
     capabilities: ["reef-root", "root-lineage", "sqlite-authority"],
   };
 }
@@ -50,8 +50,10 @@ function buildVmId(prefix) {
 }
 
 function mergeDna(baseDna, extraDna = {}) {
+  const baseServices = baseDna.services || baseDna.organs || [];
+  const extraServices = extraDna.services || extraDna.organs || [];
   return {
-    organs: unique([...(baseDna.organs || []), ...(extraDna.organs || [])]).sort(),
+    services: unique([...baseServices, ...extraServices]).sort(),
     capabilities: unique([...(baseDna.capabilities || []), ...(extraDna.capabilities || [])]).sort(),
   };
 }
@@ -140,6 +142,7 @@ export function validateSpec(input = {}) {
   const swarmCount =
     input.swarmCount === undefined ? 3 : Number.isInteger(input.swarmCount) && input.swarmCount >= 0 ? input.swarmCount : null;
   if (swarmCount === null) throw new Error("swarmCount must be a non-negative integer");
+  const bootstrapChildren = input.bootstrapChildren === false ? false : true;
 
   const rootVmId = typeof input.rootVmId === "string" && input.rootVmId.trim() ? input.rootVmId.trim() : null;
   const lieutenantVmId =
@@ -200,14 +203,19 @@ export function validateSpec(input = {}) {
   const rootExtraDna = input.rootExtraDna || {};
   const lieutenantExtraDna = input.lieutenantExtraDna || {};
   const swarmExtraDna = input.swarmExtraDna || {};
+  if (sharedExtraDna.services) ensureStringArray(sharedExtraDna.services, "sharedExtraDna.services");
   if (sharedExtraDna.organs) ensureStringArray(sharedExtraDna.organs, "sharedExtraDna.organs");
   if (sharedExtraDna.capabilities) ensureStringArray(sharedExtraDna.capabilities, "sharedExtraDna.capabilities");
+  if (rootAuthorityExtraDna.services) ensureStringArray(rootAuthorityExtraDna.services, "rootAuthorityExtraDna.services");
   if (rootAuthorityExtraDna.organs) ensureStringArray(rootAuthorityExtraDna.organs, "rootAuthorityExtraDna.organs");
   if (rootAuthorityExtraDna.capabilities) ensureStringArray(rootAuthorityExtraDna.capabilities, "rootAuthorityExtraDna.capabilities");
+  if (rootExtraDna.services) ensureStringArray(rootExtraDna.services, "rootExtraDna.services");
   if (rootExtraDna.organs) ensureStringArray(rootExtraDna.organs, "rootExtraDna.organs");
   if (rootExtraDna.capabilities) ensureStringArray(rootExtraDna.capabilities, "rootExtraDna.capabilities");
+  if (lieutenantExtraDna.services) ensureStringArray(lieutenantExtraDna.services, "lieutenantExtraDna.services");
   if (lieutenantExtraDna.organs) ensureStringArray(lieutenantExtraDna.organs, "lieutenantExtraDna.organs");
   if (lieutenantExtraDna.capabilities) ensureStringArray(lieutenantExtraDna.capabilities, "lieutenantExtraDna.capabilities");
+  if (swarmExtraDna.services) ensureStringArray(swarmExtraDna.services, "swarmExtraDna.services");
   if (swarmExtraDna.organs) ensureStringArray(swarmExtraDna.organs, "swarmExtraDna.organs");
   if (swarmExtraDna.capabilities) ensureStringArray(swarmExtraDna.capabilities, "swarmExtraDna.capabilities");
 
@@ -215,6 +223,7 @@ export function validateSpec(input = {}) {
     rootName,
     lieutenantName,
     swarmCount,
+    bootstrapChildren,
     rootVmId,
     lieutenantVmId,
     swarmVmIds,
@@ -237,9 +246,13 @@ export function buildTopology(input = {}) {
   const spec = validateSpec(input);
 
   const rootVmId = spec.rootVmId || buildVmId("infra");
-  const lieutenantVmId = spec.lieutenantVmId || buildVmId("lt");
+  const lieutenantVmId = spec.bootstrapChildren ? spec.lieutenantVmId || buildVmId("lt") : null;
   const swarmVmIds =
-    spec.swarmVmIds.length > 0 ? spec.swarmVmIds : Array.from({ length: spec.swarmCount }, () => buildVmId("swarm"));
+    spec.bootstrapChildren && spec.swarmVmIds.length > 0
+      ? spec.swarmVmIds
+      : spec.bootstrapChildren
+        ? Array.from({ length: spec.swarmCount }, () => buildVmId("swarm"))
+        : [];
 
   const sharedOperationalProfile = mergeDna(defaultSharedOperationalDna(), spec.sharedExtraDna);
   const rootAuthorityOverlay = mergeDna(defaultRootAuthorityOverlayDna(), spec.rootAuthorityExtraDna);
@@ -256,23 +269,25 @@ export function buildTopology(input = {}) {
     vmConfig: spec.rootVmConfig,
   });
 
-  const lieutenant = makeRecord({
-    vmId: lieutenantVmId,
-    name: spec.lieutenantName,
-    parentVmId: rootVmId,
-    category: DEFAULT_LIEUTENANT_CATEGORY,
-    reefConfig: mergeDna(sharedOperationalProfile, spec.lieutenantExtraDna),
-    hasSqliteAuthority: false,
-    harness: "punkin",
-    reefRole: "child",
-    vmConfig: spec.childVmConfig,
-  });
+  const lieutenant = lieutenantVmId
+    ? makeRecord({
+        vmId: lieutenantVmId,
+        name: spec.lieutenantName,
+        parentVmId: rootVmId,
+        category: DEFAULT_LIEUTENANT_CATEGORY,
+        reefConfig: mergeDna(sharedOperationalProfile, spec.lieutenantExtraDna),
+        hasSqliteAuthority: false,
+        harness: "punkin",
+        reefRole: "child",
+        vmConfig: spec.childVmConfig,
+      })
+    : null;
 
   const swarm = swarmVmIds.map((vmId, index) =>
     makeRecord({
       vmId,
       name: `swarm-${index + 1}`,
-      parentVmId: lieutenantVmId,
+      parentVmId: lieutenantVmId || rootVmId,
       category: DEFAULT_SWARM_CATEGORY,
       reefConfig: mergeDna(sharedOperationalProfile, spec.swarmExtraDna),
       hasSqliteAuthority: false,
@@ -289,6 +304,7 @@ export function buildTopology(input = {}) {
       snapshotsInBootstrap: false,
       rootOwnsSqlite: true,
       childVmMayBecomeParentLater: true,
+      bootstrapChildren: spec.bootstrapChildren,
     },
     profiles: {
       sharedOperational: sharedOperationalProfile,

@@ -15,7 +15,7 @@ Pinned harness release for V1:
 
 ## V1 Topology
 
-V1 does **not** use Vers snapshots during bootstrap. It creates fresh VMs and records lineage in the root reef authority.
+V1 does **not** use Vers snapshots during bootstrap. It creates a fresh root VM and records lineage in the root reef authority. Child lieutenants and worker VMs are created later from Reef runtime flows.
 
 Topology:
 
@@ -23,14 +23,10 @@ Topology:
    - runs `reef`
    - runs `punkin`
    - owns the SQLite-backed lineage/registry authority
-2. One `lieutenant` VM
-   - runs `reef`
-   - runs `punkin`
-   - does not load the SQLite-backed reef modules
-3. Three `swarm_vm` VMs
-   - run `reef`
-   - run `punkin`
-   - do not load the SQLite-backed reef modules
+2. Lieutenant and `swarm_vm` children are not pre-bootstrapped by default
+   - they are created later from the root Reef runtime
+   - they use `punkin` as the harness
+   - they point back to the root Reef instead of running their own Reef node
 
 All lineage and VM DNA writes go back to the root reef through reef modules.
 
@@ -41,7 +37,7 @@ VM DNA fields:
 - `parent_vm_id` nullable
 - `category`
 - `reef_config`
-  - `organs`
+  - `services`
   - `capabilities`
 
 This is intentionally flexible so child VMs can become parents later.
@@ -51,7 +47,7 @@ This is intentionally flexible so child VMs can become parents later.
 This repo now does both:
 
 - `bundle`: generate the topology and per-VM bootstrap scripts
-- `provision`: run Vers shell-auth if needed, create fresh VMs, stage local `reef` and `pi-vers`, clone public `punkin-pi` at `v1rc3`, bootstrap reef on each VM, and register lineage in the root reef
+- `provision`: run Vers shell-auth if needed, create a fresh root VM, stage local `reef` and `pi-vers`, clone public `punkin-pi` at `v1rc3`, bootstrap root Reef, and register lineage in the root reef
 
 Default source strategy:
 
@@ -71,10 +67,8 @@ Outputs:
 
 - `out/topology.json`
 - `out/root.sh`
-- `out/lieutenant.sh`
-- `out/swarm-1.sh`
-- `out/swarm-2.sh`
-- `out/swarm-3.sh`
+- `out/lieutenant.sh` only when child bootstrap is explicitly enabled
+- `out/swarm-*.sh` only when child bootstrap is explicitly enabled
 
 ```bash
 node src/cli.js provision --out-dir out --email you@example.com --force-shell-auth
@@ -96,5 +90,5 @@ node src/cli.js bundle --out-dir out
 - root reef is the only SQLite authority in the topology
 - child VMs use `punkin` as the harness
 - child/root bootstrap pins `punkin-pi` to `v1rc3` by default
-- reef module selection remains expressible via VM DNA
+- reef service selection remains expressible via VM DNA
 - child DNA intentionally excludes `store`, `registry`, and `vm-tree` so the lineage database stays rooted on the infra reef

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { provisionFleet } from "../src/orchestrate.js";
 
-test("provisionFleet creates fresh VMs, bootstraps them, and registers lineage against the root", async () => {
+test("provisionFleet bootstraps only the root by default", async () => {
   const created = [];
   const staged = [];
   const bootstrapped = [];
@@ -35,48 +35,25 @@ test("provisionFleet creates fresh VMs, bootstraps them, and registers lineage a
       registerRoot: async (topology) => {
         registered.push({ kind: "root", vmId: topology.root.vmId, parentVmId: null });
       },
-      registerChildren: async (topology) => {
-        registered.push({
-          kind: "children",
-          nodes: [topology.lieutenant, ...topology.swarm].map((vm) => ({
-            vmId: vm.vmId,
-            parentVmId: vm.parentVmId,
-            category: vm.category,
-          })),
-        });
+      registerChildren: async () => {
+        registered.push({ kind: "children" });
       },
       registerLieutenant: async (topology) => {
-        lieutenantRegistrations.push({
-          name: topology.lieutenant.name,
-          vmId: topology.lieutenant.vmId,
-          parentVmId: topology.lieutenant.parentVmId,
-        });
+        lieutenantRegistrations.push(topology.lieutenant);
       },
     },
   );
 
-  assert.deepEqual(created, ["vm-1", "vm-2", "vm-3", "vm-4"]);
-  assert.equal(staged.length, 4);
-  assert.equal(bootstrapped.length, 4);
+  assert.deepEqual(created, ["vm-1"]);
+  assert.equal(staged.length, 1);
+  assert.equal(bootstrapped.length, 1);
   assert.equal(deployment.topology.root.vmId, "vm-1");
-  assert.equal(deployment.topology.lieutenant.vmId, "vm-2");
-  assert.deepEqual(
-    deployment.topology.swarm.map((vm) => vm.vmId),
-    ["vm-3", "vm-4"],
-  );
+  assert.equal(deployment.topology.lieutenant, null);
+  assert.deepEqual(deployment.topology.swarm, []);
   assert.equal(registered[0].kind, "root");
   assert.equal(registered[1].kind, "children");
-  assert.deepEqual(
-    registered[1].nodes.map((node) => node.parentVmId),
-    ["vm-1", "vm-2", "vm-2"],
-  );
-  assert.deepEqual(lieutenantRegistrations, [
-    {
-      name: "lt-main",
-      vmId: "vm-2",
-      parentVmId: "vm-1",
-    },
-  ]);
+  assert.deepEqual(lieutenantRegistrations, [null]);
   assert.match(bootstrapped[0].script, /bootstrapping reef-root/);
-  assert.match(bootstrapped[1].script, /bootstrapping lt-main/);
+  assert.equal(deployment.nodes.root.vmId, "vm-1");
+  assert.deepEqual(deployment.nodes.swarm, []);
 });

@@ -56,7 +56,9 @@ function writeBundle(outDir, bundle) {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, "topology.json"), `${JSON.stringify(bundle.topology, null, 2)}\n`);
   writeFileSync(resolve(outDir, "root.sh"), bundle.scripts.root);
-  writeFileSync(resolve(outDir, "lieutenant.sh"), bundle.scripts.lieutenant);
+  if (bundle.scripts.lieutenant) {
+    writeFileSync(resolve(outDir, "lieutenant.sh"), bundle.scripts.lieutenant);
+  }
   for (const swarm of bundle.scripts.swarm) {
     writeFileSync(resolve(outDir, `${swarm.name}.sh`), swarm.script);
   }
@@ -95,6 +97,7 @@ async function main() {
         rootName: args.rootName,
         lieutenantName: args.lieutenantName,
         swarmCount: args.swarmCount,
+        bootstrapChildren: false,
       },
       {
         outDir: args.outDir,

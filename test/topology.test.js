@@ -17,6 +17,7 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.sources.punkin.type, "git");
   assert.equal(topology.profiles.sharedOperational.capabilities.includes("pi-vers"), true);
   assert.equal(topology.profiles.sharedOperational.capabilities.includes("punkin"), true);
+  assert.equal(topology.profiles.sharedOperational.capabilities.includes("reef-extension"), true);
   assert.equal(topology.profiles.rootAuthorityOverlay.capabilities.includes("sqlite-authority"), true);
   assert.equal(topology.root.runtime.hasSqliteAuthority, true);
   assert.equal(topology.lieutenant.runtime.hasSqliteAuthority, false);
@@ -25,15 +26,15 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.lieutenant.runtime.profile, "shared-operational");
   assert.equal(topology.lieutenant.parentVmId, topology.root.vmId);
   assert.equal(topology.swarm[0].parentVmId, topology.lieutenant.vmId);
-  assert.equal(topology.lieutenant.reefConfig.organs.includes("registry"), false);
-  assert.equal(topology.lieutenant.reefConfig.organs.includes("vm-tree"), false);
-  assert.equal(topology.lieutenant.reefConfig.organs.includes("store"), false);
-  assert.equal(topology.lieutenant.reefConfig.organs.includes("lieutenant"), true);
+  assert.equal(topology.lieutenant.reefConfig.services.includes("registry"), false);
+  assert.equal(topology.lieutenant.reefConfig.services.includes("vm-tree"), false);
+  assert.equal(topology.lieutenant.reefConfig.services.includes("store"), false);
+  assert.equal(topology.lieutenant.reefConfig.services.includes("lieutenant"), true);
   assert.deepEqual(topology.lieutenant.reefConfig, topology.swarm[0].reefConfig);
-  assert.equal(topology.root.reefConfig.organs.includes("registry"), true);
-  assert.equal(topology.root.reefConfig.organs.includes("vm-tree"), true);
-  assert.equal(topology.root.reefConfig.organs.includes("store"), true);
-  assert.equal(topology.root.reefConfig.organs.includes("commits"), true);
+  assert.equal(topology.root.reefConfig.services.includes("registry"), true);
+  assert.equal(topology.root.reefConfig.services.includes("vm-tree"), true);
+  assert.equal(topology.root.reefConfig.services.includes("store"), true);
+  assert.equal(topology.root.reefConfig.services.includes("commits"), true);
 });
 
 test("buildBootstrapBundle emits workspace-aware root and public punkin bootstrap scripts", () => {
@@ -55,6 +56,8 @@ test("buildBootstrapBundle emits workspace-aware root and public punkin bootstra
   assert.match(bundle.scripts.root, /SERVICES_DIR="\/opt\/reef\/services-active"/);
   assert.match(bundle.scripts.root, /PUNKIN_RELEASE_TAG='v1rc3'/);
   assert.doesNotMatch(bundle.scripts.lieutenant, /root\.sqlite/);
+  assert.doesNotMatch(bundle.scripts.lieutenant, /nohup bun run src\/main\.ts/);
+  assert.match(bundle.scripts.lieutenant, /configured to use root reef/);
   assert.match(bundle.scripts.lieutenant, /VERS_INFRA_URL='https:\/\/.*\.vm\.vers\.sh:3000'/);
 });
 

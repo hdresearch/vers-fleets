@@ -40,7 +40,7 @@ function buildRuntimeEnv(vm, topology, options = {}) {
     REEF_PARENT_VM_ID: vm.parentVmId || "",
     REEF_ROOT_VM_ID: topology.root.vmId,
     REEF_SQLITE_AUTHORITY: vm.runtime.hasSqliteAuthority ? "true" : "false",
-    REEF_ORGANS: shellQuote(vm.reefConfig.organs.join(",")),
+    REEF_SERVICES: shellQuote(vm.reefConfig.services.join(",")),
     REEF_CAPABILITIES: shellQuote(vm.reefConfig.capabilities.join(",")),
     PUNKIN_RELEASE_TAG: shellQuote(topology.sources.punkin.ref || "v1rc3"),
     PUNKIN_BIN: shellQuote(options.punkinBin || "punkin"),
@@ -88,10 +88,10 @@ function buildActiveServicesBlock(vm) {
   return `
 rm -rf /opt/reef/services-active
 mkdir -p /opt/reef/services-active
-ACTIVE_ORGANS=${shellQuote(vm.reefConfig.organs.join(" "))}
+ACTIVE_SERVICES=${shellQuote(vm.reefConfig.services.join(" "))}
 for dir in /opt/reef/services/*/; do
   svc=$(basename "$dir")
-  if echo "$ACTIVE_ORGANS" | grep -qw "$svc"; then
+  if echo "$ACTIVE_SERVICES" | grep -qw "$svc"; then
     ln -s "../services/$svc" "/opt/reef/services-active/$svc"
   fi
 done
@@ -102,6 +102,7 @@ export SERVICES_DIR="/opt/reef/services-active"
 function buildVmScript(vm, topology, options = {}) {
   const rootUrl = options.rootUrl || remotePublicUrl(topology.root.vmId);
   const envBlock = formatEnvBlock(buildRuntimeEnv(vm, topology, { ...options, rootUrl }));
+  const isRoot = vm.vmId === topology.root.vmId;
 
   return `#!/bin/bash
 set -euo pipefail
@@ -170,7 +171,7 @@ if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
   "${options.punkinBin || "punkin"}" install /opt/reef
 fi
 
-pkill -f "bun run src/main.ts" 2>/dev/null || true
+${isRoot ? `pkill -f "bun run src/main.ts" 2>/dev/null || true
 nohup bun run src/main.ts >/tmp/reef.log 2>&1 &
 
 for i in $(seq 1 45); do
@@ -183,7 +184,11 @@ done
 
 echo "[vers-fleets] reef failed to start on ${vm.name}" >&2
 tail -50 /tmp/reef.log >&2 || true
-exit 1
+exit 1` : `echo "[vers-fleets] child agent ${vm.name} configured to use root reef at ${rootUrl}"
+test -x /usr/local/bin/pi
+test -d /opt/pi-vers
+test -d /opt/reef/services
+exit 0`}
 `;
 }
 
@@ -193,7 +198,7 @@ export function buildBootstrapBundle(input = {}, options = {}) {
     topology,
     scripts: {
       root: buildVmScript(topology.root, topology, options),
-      lieutenant: buildVmScript(topology.lieutenant, topology, options),
+      lieutenant: topology.lieutenant ? buildVmScript(topology.lieutenant, topology, options) : null,
       swarm: topology.swarm.map((vm) => ({
         name: vm.name,
         vmId: vm.vmId,
