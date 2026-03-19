@@ -47,6 +47,10 @@ test("buildBootstrapBundle emits workspace-aware root and public punkin bootstra
   assert.match(bundle.scripts.root, /git checkout 'v1rc3'/);
   assert.match(bundle.scripts.root, /setup_22\.x/);
   assert.match(bundle.scripts.root, /HUSKY=0 npm install/);
+  assert.match(bundle.scripts.root, /PI_PATH='punkin'/);
+  assert.match(bundle.scripts.root, /ln -sf \/usr\/local\/bin\/punkin \/usr\/local\/bin\/pi/);
+  assert.match(bundle.scripts.root, /"punkin" install \/opt\/pi-vers/);
+  assert.match(bundle.scripts.root, /"punkin" install \/opt\/reef/);
   assert.match(bundle.scripts.root, /SERVICES_DIR="\/opt\/reef\/services-active"/);
   assert.match(bundle.scripts.root, /PUNKIN_RELEASE_TAG='v1rc3'/);
   assert.doesNotMatch(bundle.scripts.lieutenant, /root\.sqlite/);

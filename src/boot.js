@@ -44,6 +44,7 @@ function buildRuntimeEnv(vm, topology, options = {}) {
     REEF_CAPABILITIES: shellQuote(vm.reefConfig.capabilities.join(",")),
     PUNKIN_RELEASE_TAG: shellQuote(topology.sources.punkin.ref || "v1rc3"),
     PUNKIN_BIN: shellQuote(options.punkinBin || "punkin"),
+    PI_PATH: shellQuote(options.punkinBin || "punkin"),
     PI_VERS_HOME: shellQuote("/opt/pi-vers"),
   };
 
@@ -158,6 +159,15 @@ if [ -x /opt/punkin-pi/builds/punkin ]; then
 elif [ -x /opt/punkin-pi/packages/coding-agent/dist/cli.js ]; then
   ln -sf /opt/punkin-pi/packages/coding-agent/dist/cli.js /usr/local/bin/punkin
   chmod +x /opt/punkin-pi/packages/coding-agent/dist/cli.js
+fi
+if [ -x /usr/local/bin/punkin ]; then
+  ln -sf /usr/local/bin/punkin /usr/local/bin/pi
+fi
+
+mkdir -p /root/.pi/agent
+if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
+  "${options.punkinBin || "punkin"}" install /opt/pi-vers
+  "${options.punkinBin || "punkin"}" install /opt/reef
 fi
 
 pkill -f "bun run src/main.ts" 2>/dev/null || true
