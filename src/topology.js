@@ -29,7 +29,7 @@ export function defaultSharedOperationalDna() {
 
 export function defaultRootAuthorityOverlayDna() {
   return {
-    organs: ["registry", "store", "vm-tree"],
+    organs: ["commits", "registry", "store", "vm-tree"],
     capabilities: ["reef-root", "root-lineage", "sqlite-authority"],
   };
 }

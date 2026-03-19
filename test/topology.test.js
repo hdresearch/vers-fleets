@@ -33,6 +33,7 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.root.reefConfig.organs.includes("registry"), true);
   assert.equal(topology.root.reefConfig.organs.includes("vm-tree"), true);
   assert.equal(topology.root.reefConfig.organs.includes("store"), true);
+  assert.equal(topology.root.reefConfig.organs.includes("commits"), true);
 });
 
 test("buildBootstrapBundle emits workspace-aware root and public punkin bootstrap scripts", () => {
