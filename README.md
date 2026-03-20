@@ -75,6 +75,8 @@ curl -sk -X POST "$ROOT_URL/auth/magic-link" \
 - Create `~/.vers` if it does not already exist.
 - If the same `VERS_API_KEY` is already stored there, do not rewrite it.
 - Tell the user whether you stored the key or detected that the existing stored key already matched.
+- If creating `~/.vers` or writing the key fails, tell the user plainly that you were trying to save the API key somewhere safe on their computer so future Vers setup can reuse it automatically.
+- If that save fails, explain the failure in simple language rather than assuming the user is technical.
 
 7. Do not create child lieutenants or worker VMs here.
 
