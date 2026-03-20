@@ -13,6 +13,10 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.semantics.rootOwnsSqlite, true);
   assert.equal(topology.sources.punkin.ref, "v1rc3");
   assert.equal(topology.sources.punkin.type, "git");
+  assert.equal(topology.sources.reef.type, "git");
+  assert.equal(topology.sources.reef.ref, "main");
+  assert.equal(topology.sources.piVers.type, "git");
+  assert.equal(topology.sources.piVers.ref, "main");
   assert.equal(topology.profiles.sharedOperational.capabilities.includes("pi-vers"), true);
   assert.equal(topology.profiles.sharedOperational.capabilities.includes("punkin"), true);
   assert.equal(topology.profiles.sharedOperational.capabilities.includes("reef-extension"), true);
@@ -27,12 +31,14 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.deepEqual(topology.swarm, []);
 });
 
-test("buildBootstrapBundle emits only the root bootstrap script", () => {
+test("buildBootstrapBundle emits git-based root bootstrap script", () => {
   const bundle = buildBootstrapBundle({
     rootName: "reef-root",
   });
 
-  assert.match(bundle.scripts.root, /expected staged workspace source at \/opt\/src\/reef/);
+  assert.match(bundle.scripts.root, /git clone 'https:\/\/github.com\/hdresearch\/reef\.git' '\/opt\/src\/reef'/);
+  assert.match(bundle.scripts.root, /git checkout 'main'/);
+  assert.match(bundle.scripts.root, /git clone 'https:\/\/github.com\/hdresearch\/pi-vers\.git' '\/opt\/src\/pi-vers'/);
   assert.match(bundle.scripts.root, /git clone 'https:\/\/github.com\/hdresearch\/punkin-pi\.git' '\/opt\/src\/punkin-pi'/);
   assert.match(bundle.scripts.root, /git checkout 'v1rc3'/);
   assert.match(bundle.scripts.root, /setup_22\.x/);

@@ -144,20 +144,20 @@ export function validateSpec(input = {}) {
 
   const sources = {
     reef: normalizeSource("sources.reef", input.sources?.reef, {
-      type: "workspace",
-      repoPath: "../reef",
+      type: "git",
+      repoPath: null,
       repoUrl: "https://github.com/hdresearch/reef.git",
-      ref: null,
+      ref: "main",
     }),
     piVers: normalizeSource("sources.piVers", input.sources?.piVers, {
-      type: "workspace",
-      repoPath: "../pi-vers",
+      type: "git",
+      repoPath: null,
       repoUrl: "https://github.com/hdresearch/pi-vers.git",
-      ref: null,
+      ref: "main",
     }),
     punkin: normalizeSource("sources.punkin", input.sources?.punkin, {
       type: "git",
-      repoPath: "../punkin-pi",
+      repoPath: null,
       repoUrl: "https://github.com/hdresearch/punkin-pi.git",
       ref: "v1rc3",
     }),
