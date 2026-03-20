@@ -35,11 +35,14 @@ export VERS_API_KEY=your_vers_api_key
 node src/cli.js provision --out-dir out/live
 ```
 
-3. Ensure an Anthropic API key is available for the resulting Reef runtime.
+3. Ensure an LLM provider API key is available for the resulting Reef runtime.
 
-- If `ANTHROPIC_API_KEY` is already present in the shell, use it.
-- Tell the user that you used `ANTHROPIC_API_KEY` from the current shell.
-- If it is not present, stop and ask the user to provide one before continuing.
+- If one of these is already present in the shell, use it:
+  - `ANTHROPIC_API_KEY`
+  - `OPENAI_API_KEY`
+  - or another supported LLM provider API key
+- Tell the user which env var you used from the current shell.
+- If none is present, stop and ask the user to provide one before continuing.
 
 4. Expect this repo to:
 
@@ -48,7 +51,32 @@ node src/cli.js provision --out-dir out/live
 - pin `punkin-pi` to `v1rc3`
 - write `out/live/deployment.json` with the root VM id, root Reef URL, and auth token
 
-5. Do not create child lieutenants or worker VMs here.
+5. After provisioning succeeds and the root Reef health check is good, automatically generate a magic-link login URL for the user.
+
+- Read the root Reef URL and auth token from `out/live/deployment.json`
+- Call the root Reef magic-link endpoint
+- Return the full login URL the user can paste into a browser
+- Also tell the user: `Your link expires in X minutes`
+- Compute `X` from the actual expiration timestamp returned by the API, not a guess
+
+Example flow:
+
+```bash
+ROOT_URL="$(node -e 'const d=require("./out/live/deployment.json"); console.log(d.nodes.root.url)')"
+VERS_AUTH_TOKEN="$(node -e 'const d=require("./out/live/deployment.json"); console.log(d.auth.versAuthToken)')"
+
+curl -sk -X POST "$ROOT_URL/auth/magic-link" \
+  -H "Authorization: Bearer $VERS_AUTH_TOKEN"
+```
+
+6. After the magic link is generated, persist the `VERS_API_KEY` on the user's local machine.
+
+- If the Vers API key came from shell auth or was provided directly by the user, store it under `~/.vers` in the user's home directory.
+- Create `~/.vers` if it does not already exist.
+- If the same `VERS_API_KEY` is already stored there, do not rewrite it.
+- Tell the user whether you stored the key or detected that the existing stored key already matched.
+
+7. Do not create child lieutenants or worker VMs here.
 
 - `vers-fleets` bootstraps only the root Reef VM
 - child VMs are created later by Reef runtime flows
