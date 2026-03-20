@@ -8,12 +8,56 @@ import { buildBootstrapBundle } from "./boot.js";
 import { createPiVersClient, ensurePiVersApiKey } from "./pi-vers.js";
 import { buildTopology, validateSpec } from "./topology.js";
 
+const DEFAULT_LLM_PROXY_BASE_URL = "https://tokens.vers.sh";
+
 function createAuthToken() {
   return randomBytes(32).toString("hex");
 }
 
 function publicVmUrl(vmId) {
   return `https://${vmId}.vm.vers.sh:3000`;
+}
+
+function parseJsonResponse(text) {
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {};
+  }
+}
+
+async function exchangeVersLlmKey({ versApiKey, name, fetchImpl = fetch, baseUrl = DEFAULT_LLM_PROXY_BASE_URL }) {
+  if (!versApiKey || typeof versApiKey !== "string" || !versApiKey.trim()) {
+    throw new Error("VERS_API_KEY is required before exchanging an LLM proxy key");
+  }
+
+  const healthResponse = await fetchImpl(`${baseUrl}/health`);
+  const healthText = await healthResponse.text().catch(() => "");
+  if (!healthResponse.ok) {
+    throw new Error(`LLM proxy health check failed (${healthResponse.status}): ${healthText}`);
+  }
+
+  const exchangeResponse = await fetchImpl(`${baseUrl}/v1/keys/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      vers_api_key: versApiKey,
+      name,
+    }),
+  });
+  const exchangeText = await exchangeResponse.text().catch(() => "");
+  const payload = parseJsonResponse(exchangeText);
+  if (!exchangeResponse.ok) {
+    throw new Error(
+      `LLM key exchange failed (${exchangeResponse.status}): ${payload?.error || exchangeText || "unknown error"}`,
+    );
+  }
+  if (!payload.key || typeof payload.key !== "string" || !payload.key.startsWith("sk-vers-")) {
+    throw new Error("LLM key exchange did not return a valid sk-vers-* key");
+  }
+
+  return payload;
 }
 
 async function apiRequest(baseUrl, token, method, path, body, fetchImpl = fetch) {
@@ -182,8 +226,21 @@ export async function provisionFleet(input = {}, options = {}) {
   const auth = options.ensureVersApiKey
     ? await options.ensureVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true })
     : await ensurePiVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true });
-  const authToken = options.authToken || process.env[spec.authTokenEnv] || createAuthToken();
   const fetchImpl = options.fetchImpl || fetch;
+  const resolveLlmProxyKey =
+    options.resolveLlmProxyKey ||
+    ((ctx) =>
+      exchangeVersLlmKey({
+        versApiKey: ctx.versApiKey,
+        name: `vers-fleets-${ctx.rootName}`,
+        fetchImpl,
+        baseUrl: options.llmProxyBaseUrl || DEFAULT_LLM_PROXY_BASE_URL,
+      }));
+  const llmProxy = await resolveLlmProxyKey({
+    versApiKey: auth.apiKey,
+    rootName: spec.rootName,
+  });
+  const authToken = options.authToken || process.env[spec.authTokenEnv] || createAuthToken();
   const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey, fetchImpl }));
   const rootVm = await client.createRoot(spec.rootVmConfig, true);
 
@@ -201,7 +258,7 @@ export async function provisionFleet(input = {}, options = {}) {
       rootUrl,
       versApiKey: auth.apiKey,
       versAuthToken: authToken,
-      anthropicApiKey: process.env[spec.anthroKeyEnv] || "",
+      llmProxyKey: llmProxy.key,
     },
   );
 
@@ -222,6 +279,10 @@ export async function provisionFleet(input = {}, options = {}) {
     auth: {
       versApiKeySource: auth.source,
       versAuthToken: authToken,
+      llmProxyKey: llmProxy.key,
+      llmProxyKeyPrefix: llmProxy.key_prefix || "",
+      llmProxyKeyId: llmProxy.id || "",
+      llmProxyTeamId: llmProxy.team_id || "",
     },
     nodes: {
       root: {

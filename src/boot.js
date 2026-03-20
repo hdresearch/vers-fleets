@@ -1,4 +1,4 @@
-import { buildTopology } from "./topology.js";
+import { DEFAULT_PUNKIN_RELEASE_TAG, buildTopology } from "./topology.js";
 
 function shellQuote(value) {
   return `'${String(value).replace(/'/g, `'\\''`)}'`;
@@ -31,10 +31,12 @@ function buildRuntimeEnv(vm, topology, options = {}) {
         ? shellQuote(options.versAuthToken)
         : `\${${topology.env.versAuthTokenEnv}:-}`,
     VERS_INFRA_URL: shellQuote(rootUrl),
-    ANTHROPIC_API_KEY:
-      options.anthropicApiKey && String(options.anthropicApiKey).trim()
-        ? shellQuote(options.anthropicApiKey)
-        : `\${${topology.env.anthropicApiKeyEnv}:-}`,
+    LLM_PROXY_KEY:
+      options.llmProxyKey && String(options.llmProxyKey).trim()
+        ? shellQuote(options.llmProxyKey)
+        : process.env.LLM_PROXY_KEY
+          ? shellQuote(process.env.LLM_PROXY_KEY)
+          : "",
     REEF_ROLE: vm.runtime.reefRole,
     REEF_CATEGORY: vm.category,
     REEF_PARENT_VM_ID: vm.parentVmId || "",
@@ -42,7 +44,7 @@ function buildRuntimeEnv(vm, topology, options = {}) {
     REEF_SQLITE_AUTHORITY: vm.runtime.hasSqliteAuthority ? "true" : "false",
     REEF_SERVICES: shellQuote(vm.reefConfig.services.join(",")),
     REEF_CAPABILITIES: shellQuote(vm.reefConfig.capabilities.join(",")),
-    PUNKIN_RELEASE_TAG: shellQuote(topology.sources.punkin.ref || "v1rc3"),
+    PUNKIN_RELEASE_TAG: shellQuote(topology.sources.punkin.ref || DEFAULT_PUNKIN_RELEASE_TAG),
     PUNKIN_BIN: shellQuote(options.punkinBin || "punkin"),
     PI_PATH: shellQuote(options.punkinBin || "punkin"),
     PI_VERS_HOME: shellQuote("/opt/pi-vers"),
@@ -51,7 +53,7 @@ function buildRuntimeEnv(vm, topology, options = {}) {
   return env;
 }
 
-function buildSourceScript(name, source, targetDir) {
+function buildSourceScript(name, source, targetDir, options = {}) {
   if (source.type === "workspace") {
     return `
 if [ ! -d ${shellQuote(targetDir)} ]; then
@@ -64,7 +66,11 @@ fi
   const refBlock = source.ref
     ? `
 git fetch --tags --force origin
-git checkout ${shellQuote(source.ref)}
+if ${options.preferExactTag ? `git rev-parse --verify -q ${shellQuote(`refs/tags/${source.ref}`)} >/dev/null` : "false"}; then
+  git -c advice.detachedHead=false checkout --detach ${shellQuote(`refs/tags/${source.ref}`)}
+else
+  git checkout ${shellQuote(source.ref)}
+fi
 `
     : `
 git fetch origin
@@ -127,7 +133,7 @@ mkdir -p /opt/src
 
 ${buildSourceScript("reef", topology.sources.reef, "/opt/src/reef")}
 ${buildSourceScript("pi-vers", topology.sources.piVers, "/opt/src/pi-vers")}
-${buildSourceScript("punkin-pi", topology.sources.punkin, "/opt/src/punkin-pi")}
+${buildSourceScript("punkin-pi", topology.sources.punkin, "/opt/src/punkin-pi", { preferExactTag: true })}
 
 ln -sfn /opt/src/reef /opt/reef
 ln -sfn /opt/src/pi-vers /opt/pi-vers
@@ -143,6 +149,14 @@ npm run build
 
 cd /opt/reef
 bun install
+
+for pkg_root in /opt/pi-vers /opt/reef; do
+  mkdir -p "$pkg_root/node_modules/@mariozechner"
+  ln -sfn /opt/punkin-pi/packages/tui "$pkg_root/node_modules/@mariozechner/pi-tui"
+  ln -sfn /opt/punkin-pi/packages/coding-agent "$pkg_root/node_modules/@mariozechner/pi-coding-agent"
+  ln -sfn /opt/punkin-pi/packages/ai "$pkg_root/node_modules/@mariozechner/pi-ai"
+  ln -sfn /opt/punkin-pi/packages/agent "$pkg_root/node_modules/@mariozechner/pi-agent-core"
+done
 
 cat > /opt/reef/.env <<ENVEOF
 ${envBlock}
@@ -164,7 +178,7 @@ if [ -x /usr/local/bin/punkin ]; then
   ln -sf /usr/local/bin/punkin /usr/local/bin/pi
 fi
 
-mkdir -p /root/.pi/agent
+mkdir -p /root/.punkin/agent /root/.pi/agent
 if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
   "${options.punkinBin || "punkin"}" install /opt/pi-vers
   "${options.punkinBin || "punkin"}" install /opt/reef

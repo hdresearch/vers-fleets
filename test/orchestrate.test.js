@@ -32,6 +32,12 @@ test("provisionFleet bootstraps only the root by default", async () => {
       registerRoot: async (topology) => {
         registered.push({ kind: "root", vmId: topology.root.vmId, parentVmId: null });
       },
+      resolveLlmProxyKey: async () => ({
+        key: "sk-vers-test",
+        key_prefix: "sk-vers-test",
+        id: "llm-key-id",
+        team_id: "llm-team-id",
+      }),
     },
   );
 
@@ -43,7 +49,9 @@ test("provisionFleet bootstraps only the root by default", async () => {
   assert.deepEqual(deployment.topology.swarm, []);
   assert.equal(registered[0].kind, "root");
   assert.match(bootstrapped[0].script, /bootstrapping reef-root/);
+  assert.match(bootstrapped[0].script, /LLM_PROXY_KEY='sk-vers-test'/);
   assert.equal(deployment.nodes.root.vmId, "vm-1");
   assert.equal(deployment.nodes.lieutenant, null);
   assert.deepEqual(deployment.nodes.swarm, []);
+  assert.equal(deployment.auth.llmProxyKey, "sk-vers-test");
 });

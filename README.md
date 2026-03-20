@@ -6,7 +6,7 @@ Use:
 
 - `reef` from GitHub `main`
 - `pi-vers` from GitHub `main`
-- `punkin-pi` pinned to `https://github.com/hdresearch/punkin-pi/releases/tag/v1rc3`
+- `punkin-pi` pinned to `https://github.com/hdresearch/punkin-pi/releases/tag/w%2Frouter`
 
 Do not assume sibling local repos exist. Do not use `../reef`, `../pi-vers`, or `../punkin-pi`.
 
@@ -35,20 +35,18 @@ export VERS_API_KEY=your_vers_api_key
 node src/cli.js provision --out-dir out/live
 ```
 
-3. Ensure an LLM provider API key is available for the resulting Reef runtime.
+3. Ensure a valid `VERS_API_KEY` is available for provisioning.
 
-- If one of these is already present in the shell, use it:
-  - `ANTHROPIC_API_KEY`
-  - `OPENAI_API_KEY`
-  - or another supported LLM provider API key
-- Tell the user which env var you used from the current shell.
-- If none is present, stop and ask the user to provide one before continuing.
+- `vers-fleets` now exchanges that raw Vers platform key against `https://tokens.vers.sh/v1/keys/exchange`
+- the returned `sk-vers-*` key becomes `LLM_PROXY_KEY` for the root Reef runtime and all child agent VMs
+- do not ask for or wire any separate provider API key
+- if the exchange health check or key exchange fails, stop and report that directly
 
 4. Expect this repo to:
 
 - create a fresh root Reef infra VM
 - bootstrap that root VM from public `main` branches of `reef` and `pi-vers`
-- pin `punkin-pi` to `v1rc3`
+- pin `punkin-pi` to `w/router`
 - write `out/live/deployment.json` with the root VM id, root Reef URL, and auth token
 
 5. After provisioning succeeds and the root Reef health check is good, automatically generate a magic-link login URL for the user.
@@ -121,8 +119,8 @@ Architecture split:
 
 Pinned harness release for V1:
 
-- `punkin-pi` tag: `v1rc3`
-- source: `https://github.com/hdresearch/punkin-pi/releases/tag/v1rc3`
+- `punkin-pi` tag: `w/router`
+- source: `https://github.com/hdresearch/punkin-pi/releases/tag/w%2Frouter`
 
 ## V1 Topology
 
@@ -158,13 +156,13 @@ This is intentionally flexible so child VMs can become parents later.
 This repo now does both:
 
 - `bundle`: generate the root topology and root bootstrap script
-- `provision`: run Vers shell-auth if needed, create a fresh root VM, clone public `reef` and `pi-vers` from `main`, clone public `punkin-pi` at `v1rc3`, bootstrap root Reef, and register lineage in the root reef
+- `provision`: run Vers shell-auth if needed, create a fresh root VM, clone public `reef` and `pi-vers` from `main`, clone public `punkin-pi` at `w/router`, bootstrap root Reef, and register lineage in the root reef
 
 Default source strategy:
 
 - `reef`: public GitHub `main`
 - `pi-vers`: public GitHub `main`
-- `punkin-pi`: public git source pinned to tag `v1rc3`
+- `punkin-pi`: public git source pinned to tag `w/router`
 
 The provisioning path in this repo now calls into `pi-vers` for shell-auth and Vers VM transport instead of carrying a separate duplicate implementation.
 
@@ -198,6 +196,6 @@ node src/cli.js bundle --out-dir out
 - `snapshotsInBootstrap` is always `false`
 - root reef is the only SQLite authority in the topology
 - child VMs use `punkin` as the harness
-- child/root bootstrap pins `punkin-pi` to `v1rc3` by default
+- child/root bootstrap pins `punkin-pi` to `w/router` by default
 - reef service selection remains expressible via VM DNA
 - runtime child VMs are created later from Reef golden-image flows, not from this repo
