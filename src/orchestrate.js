@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolve } from "node:path";
-import { buildBootstrapBundle } from "./boot.js";
+import { buildBootstrapBundle, buildImageScript, buildRuntimeScript, buildRuntimeEnv } from "./boot.js";
 import { createPiVersClient, ensurePiVersApiKey } from "./pi-vers.js";
 import { buildTopology, validateSpec } from "./topology.js";
 
@@ -221,6 +221,149 @@ function writeDeployment(outDir, deployment) {
   writeFileSync(resolve(outDir, "deployment.json"), `${JSON.stringify(deployment, null, 2)}\n`);
 }
 
+// =============================================================================
+// build-root: Build a root reef image and commit it (no secrets)
+// =============================================================================
+
+export async function buildRoot(input = {}, options = {}) {
+  const spec = validateSpec(input);
+  const auth = options.ensureVersApiKey
+    ? await options.ensureVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true })
+    : await ensurePiVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true });
+  const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey }));
+
+  const topology = buildTopology(input);
+  const imageScript = buildImageScript(topology, {});
+
+  console.log("[vers-fleets] Creating VM for root image build...");
+  const rootVm = await client.createRoot(spec.rootVmConfig, true);
+  const vmId = rootVm.vm_id;
+
+  try {
+    const stageSources = options.stageSources || defaultStageSources;
+    await stageSources(client, vmId, topology);
+
+    console.log("[vers-fleets] Running image build script (this may take a few minutes)...");
+    await client.execScript(vmId, imageScript);
+
+    console.log("[vers-fleets] Committing root image...");
+    const committed = await client.commit(vmId, true);
+
+    console.log("[vers-fleets] Cleaning up builder VM...");
+    try {
+      await client.delete(vmId);
+    } catch {
+      // Commit is durable; deletion is best-effort
+    }
+
+    const result = {
+      commitId: committed.commit_id,
+      vmId,
+      versApiKey: auth.apiKey,
+      versApiKeySource: auth.source,
+    };
+
+    if (options.outDir) {
+      mkdirSync(options.outDir, { recursive: true });
+      writeFileSync(
+        resolve(options.outDir, "build-root.json"),
+        `${JSON.stringify(result, null, 2)}\n`,
+      );
+    }
+
+    return result;
+  } catch (error) {
+    try {
+      await client.delete(vmId);
+    } catch {
+      // Ignore cleanup failure
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// build-golden: Build a golden agent image and commit it (no secrets)
+// =============================================================================
+
+export async function buildGolden(input = {}, options = {}) {
+  const auth = options.ensureVersApiKey
+    ? await options.ensureVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true })
+    : await ensurePiVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true });
+  const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey }));
+
+  // Import the golden bootstrap script builder from reef
+  const { buildGoldenBootstrapScript } = await import(
+    resolve(options.reefPath || "../reef", "services/commits/golden.js")
+  ).catch(() => {
+    // Fallback: use the pi-vers golden module if reef isn't available locally
+    throw new Error(
+      "Could not load reef golden bootstrap. Set --reef-path to the local reef directory.",
+    );
+  });
+
+  const DEFAULT_GOLDEN_VM_CONFIG = {
+    vcpu_count: 2,
+    mem_size_mib: 4096,
+    fs_size_mib: 8192,
+  };
+
+  const vmConfig = input.vmConfig || DEFAULT_GOLDEN_VM_CONFIG;
+  const reefDir = resolve(options.reefPath || "../reef");
+  const piVersDir = resolve(options.piVersPath || "../pi-vers");
+
+  console.log("[vers-fleets] Creating VM for golden image build...");
+  const builder = await client.createRoot(vmConfig, true);
+  const vmId = builder.vm_id;
+
+  try {
+    console.log("[vers-fleets] Uploading reef and pi-vers sources...");
+    await client.uploadDirectory(vmId, reefDir, "/root/reef");
+    await client.uploadDirectory(vmId, piVersDir, "/root/pi-vers");
+
+    console.log("[vers-fleets] Running golden image build script (this may take a few minutes)...");
+    await client.execScript(vmId, buildGoldenBootstrapScript());
+
+    console.log("[vers-fleets] Committing golden image...");
+    const committed = await client.commit(vmId, true);
+
+    console.log("[vers-fleets] Cleaning up builder VM...");
+    try {
+      await client.delete(vmId);
+    } catch {
+      // Commit is durable
+    }
+
+    const result = {
+      commitId: committed.commit_id,
+      vmId,
+      versApiKey: auth.apiKey,
+      versApiKeySource: auth.source,
+    };
+
+    if (options.outDir) {
+      mkdirSync(options.outDir, { recursive: true });
+      writeFileSync(
+        resolve(options.outDir, "build-golden.json"),
+        `${JSON.stringify(result, null, 2)}\n`,
+      );
+    }
+
+    return result;
+  } catch (error) {
+    try {
+      await client.delete(vmId);
+    } catch {
+      // Ignore cleanup failure
+    }
+    throw error;
+  }
+}
+
+// =============================================================================
+// provision: Full provisioning (from scratch or from pre-built commits)
+// =============================================================================
+
 export async function provisionFleet(input = {}, options = {}) {
   const spec = validateSpec(input);
   const auth = options.ensureVersApiKey
@@ -242,36 +385,64 @@ export async function provisionFleet(input = {}, options = {}) {
   });
   const authToken = options.authToken || process.env[spec.authTokenEnv] || createAuthToken();
   const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey, fetchImpl }));
-  const rootVm = await client.createRoot(spec.rootVmConfig, true);
+
+  const rootCommitId = options.rootCommitId || null;
+  const goldenCommitId = options.goldenCommitId || null;
+
+  let rootVm;
+  if (rootCommitId) {
+    // Fast path: restore from pre-built root image
+    console.log(`[vers-fleets] Restoring root from commit ${rootCommitId}...`);
+    rootVm = await client.restoreFromCommit(rootCommitId);
+  } else {
+    // Legacy path: create fresh VM
+    rootVm = await client.createRoot(spec.rootVmConfig, true);
+  }
 
   const topology = buildTopology({
     ...input,
     rootVmId: rootVm.vm_id,
   });
   const rootUrl = publicVmUrl(topology.root.vmId);
-  const bundle = buildBootstrapBundle(
-    {
-      ...input,
-      rootVmId: topology.root.vmId,
-    },
-    {
+
+  if (rootCommitId) {
+    // Fast path: only run the runtime script (inject secrets + start reef)
+    const runtimeScript = buildRuntimeScript(topology.root, topology, {
       rootUrl,
       versApiKey: auth.apiKey,
       versAuthToken: authToken,
       llmProxyKey: llmProxy.key,
-    },
-  );
+      goldenCommitId,
+    });
+    const runBootstrap = options.runBootstrap || (async (vmId, script) => client.execScript(vmId, script));
+    await runBootstrap(topology.root.vmId, runtimeScript);
+  } else {
+    // Legacy path: full build + runtime
+    const bundle = buildBootstrapBundle(
+      {
+        ...input,
+        rootVmId: topology.root.vmId,
+      },
+      {
+        rootUrl,
+        versApiKey: auth.apiKey,
+        versAuthToken: authToken,
+        llmProxyKey: llmProxy.key,
+        goldenCommitId,
+      },
+    );
 
-  const stageSources = options.stageSources || defaultStageSources;
-  const runBootstrap = options.runBootstrap || (async (vmId, script) => client.execScript(vmId, script));
-  const registerRoot = options.registerRoot || ((fleetTopology) => registerRootFleetRecords(fleetTopology, authToken, fetchImpl));
-  const nodes = [{ vmId: topology.root.vmId, script: bundle.scripts.root }];
+    const stageSources = options.stageSources || defaultStageSources;
+    const runBootstrap = options.runBootstrap || (async (vmId, script) => client.execScript(vmId, script));
+    const nodes = [{ vmId: topology.root.vmId, script: bundle.scripts.root }];
 
-  for (const node of nodes) {
-    await stageSources(client, node.vmId, topology);
-    await runBootstrap(node.vmId, node.script);
+    for (const node of nodes) {
+      await stageSources(client, node.vmId, topology);
+      await runBootstrap(node.vmId, node.script);
+    }
   }
 
+  const registerRoot = options.registerRoot || ((fleetTopology) => registerRootFleetRecords(fleetTopology, authToken, fetchImpl));
   await registerRoot(topology);
 
   const deployment = {

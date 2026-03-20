@@ -15,7 +15,7 @@ function remotePublicUrl(vmId) {
   return `https://${vmId}.vm.vers.sh:3000`;
 }
 
-function buildRuntimeEnv(vm, topology, options = {}) {
+export function buildRuntimeEnv(vm, topology, options = {}) {
   const rootUrl = options.rootUrl || remotePublicUrl(topology.root.vmId);
   const env = {
     PORT: "3000",
@@ -49,6 +49,10 @@ function buildRuntimeEnv(vm, topology, options = {}) {
     PI_PATH: shellQuote(options.punkinBin || "punkin"),
     PI_VERS_HOME: shellQuote("/opt/pi-vers"),
   };
+
+  if (options.goldenCommitId && String(options.goldenCommitId).trim()) {
+    env.VERS_GOLDEN_COMMIT_ID = shellQuote(options.goldenCommitId);
+  }
 
   return env;
 }
@@ -105,21 +109,23 @@ export SERVICES_DIR="/opt/reef/services-active"
 `;
 }
 
-function buildVmScript(vm, topology, options = {}) {
-  const rootUrl = options.rootUrl || remotePublicUrl(topology.root.vmId);
-  const envBlock = formatEnvBlock(buildRuntimeEnv(vm, topology, { ...options, rootUrl }));
-
+/**
+ * Phase 1: Build the root reef image — install system deps, clone repos,
+ * build all packages, install punkin CLI. No secrets, no runtime config.
+ * The result can be committed as a public image.
+ */
+export function buildImageScript(topology, options = {}) {
   return `#!/bin/bash
 set -euo pipefail
 
-echo "[vers-fleets] bootstrapping ${vm.name} (${vm.category})"
+echo "[vers-fleets] building root reef image"
 export DEBIAN_FRONTEND=noninteractive
 export PATH="/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 apt-get update -qq
 apt-get install -y -qq curl git ca-certificates build-essential openssl unzip
 
-if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'Number(process.versions.node.split(\".\")[0])' 2>/dev/null || echo 0)" -lt 20 ]; then
+if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'Number(process.versions.node.split(".")[ 0])' 2>/dev/null || echo 0)" -lt 20 ]; then
   curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
   apt-get install -y -qq nodejs
 fi
@@ -158,16 +164,6 @@ for pkg_root in /opt/pi-vers /opt/reef; do
   ln -sfn /opt/punkin-pi/packages/agent "$pkg_root/node_modules/@mariozechner/pi-agent-core"
 done
 
-cat > /opt/reef/.env <<ENVEOF
-${envBlock}
-ENVEOF
-
-set -a
-source /opt/reef/.env
-set +a
-
-${buildActiveServicesBlock(vm)}
-
 if [ -x /opt/punkin-pi/builds/punkin ]; then
   ln -sf /opt/punkin-pi/builds/punkin /usr/local/bin/punkin
 elif [ -x /opt/punkin-pi/packages/coding-agent/dist/cli.js ]; then
@@ -184,6 +180,35 @@ if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
   "${options.punkinBin || "punkin"}" install /opt/reef
 fi
 
+echo "[vers-fleets] root reef image build complete"
+`;
+}
+
+/**
+ * Phase 2: Inject secrets and start reef. Runs on a VM that already has
+ * the image built (either from buildImageScript or restored from a commit).
+ */
+export function buildRuntimeScript(vm, topology, options = {}) {
+  const rootUrl = options.rootUrl || remotePublicUrl(topology.root.vmId);
+  const envBlock = formatEnvBlock(buildRuntimeEnv(vm, topology, { ...options, rootUrl }));
+
+  return `#!/bin/bash
+set -euo pipefail
+
+echo "[vers-fleets] configuring runtime for ${vm.name}"
+export PATH="/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
+cat > /opt/reef/.env <<ENVEOF
+${envBlock}
+ENVEOF
+
+set -a
+source /opt/reef/.env
+set +a
+
+${buildActiveServicesBlock(vm)}
+
+cd /opt/reef
 pkill -f "bun run src/main.ts" 2>/dev/null || true
 nohup bun run src/main.ts >/tmp/reef.log 2>&1 &
 
@@ -199,6 +224,20 @@ echo "[vers-fleets] reef failed to start on ${vm.name}" >&2
 tail -50 /tmp/reef.log >&2 || true
 exit 1
 `;
+}
+
+/**
+ * Combined script (image build + runtime) — used by legacy `provision` when
+ * building from scratch without a pre-built image.
+ */
+function buildVmScript(vm, topology, options = {}) {
+  const imageScript = buildImageScript(topology, options);
+  const runtimeScript = buildRuntimeScript(vm, topology, options);
+  // Strip the shebang and set -euo from the runtime script since the image script already has them
+  const runtimeBody = runtimeScript
+    .replace(/^#!.*\n/, "")
+    .replace(/^set -euo pipefail\n/, "");
+  return imageScript + "\n" + runtimeBody;
 }
 
 export function buildBootstrapBundle(input = {}, options = {}) {

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildBootstrapBundle } from "../src/boot.js";
+import { buildBootstrapBundle, buildImageScript, buildRuntimeScript } from "../src/boot.js";
 import { buildTopology } from "../src/topology.js";
 
 test("buildTopology creates root-only sqlite authority topology", () => {
@@ -71,4 +71,36 @@ test("buildBootstrapBundle can inline runtime secrets for remote bootstrap", () 
   assert.match(bundle.scripts.root, /VERS_API_KEY='vers-secret'/);
   assert.match(bundle.scripts.root, /VERS_AUTH_TOKEN='auth-secret'/);
   assert.match(bundle.scripts.root, /LLM_PROXY_KEY='sk-vers-secret'/);
+});
+
+test("buildImageScript produces a secret-free image build script", () => {
+  const topology = buildTopology({ rootName: "reef-root" });
+  const script = buildImageScript(topology);
+  assert.match(script, /building root reef image/);
+  assert.match(script, /git clone/);
+  assert.match(script, /HUSKY=0 npm install/);
+  assert.match(script, /bun install/);
+  assert.match(script, /image build complete/);
+  // No secrets in the image script
+  assert.doesNotMatch(script, /VERS_API_KEY/);
+  assert.doesNotMatch(script, /LLM_PROXY_KEY/);
+  assert.doesNotMatch(script, /VERS_AUTH_TOKEN/);
+  assert.doesNotMatch(script, /\.env/);
+});
+
+test("buildRuntimeScript injects secrets and starts reef", () => {
+  const topology = buildTopology({ rootName: "reef-root", rootVmId: "vm-1" });
+  const script = buildRuntimeScript(topology.root, topology, {
+    versApiKey: "vers-key",
+    versAuthToken: "auth-token",
+    llmProxyKey: "sk-vers-proxy",
+    goldenCommitId: "golden-abc-123",
+  });
+  assert.match(script, /configuring runtime for reef-root/);
+  assert.match(script, /VERS_API_KEY='vers-key'/);
+  assert.match(script, /VERS_AUTH_TOKEN='auth-token'/);
+  assert.match(script, /LLM_PROXY_KEY='sk-vers-proxy'/);
+  assert.match(script, /VERS_GOLDEN_COMMIT_ID='golden-abc-123'/);
+  assert.match(script, /bun run src\/main\.ts/);
+  assert.match(script, /reef is healthy/);
 });
