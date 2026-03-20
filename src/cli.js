@@ -10,8 +10,6 @@ function parseArgs(argv) {
     command: "bundle",
     outDir: "out",
     rootName: "root-reef",
-    lieutenantName: "lieutenant-1",
-    swarmCount: 3,
     email: "",
     forceShellAuth: false,
   };
@@ -30,12 +28,6 @@ function parseArgs(argv) {
       i += 1;
     } else if (arg === "--root-name" && next) {
       args.rootName = next;
-      i += 1;
-    } else if (arg === "--lieutenant-name" && next) {
-      args.lieutenantName = next;
-      i += 1;
-    } else if (arg === "--swarm-count" && next) {
-      args.swarmCount = Number(next);
       i += 1;
     } else if (arg === "--email" && next) {
       args.email = next;
@@ -56,18 +48,14 @@ function writeBundle(outDir, bundle) {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, "topology.json"), `${JSON.stringify(bundle.topology, null, 2)}\n`);
   writeFileSync(resolve(outDir, "root.sh"), bundle.scripts.root);
-  writeFileSync(resolve(outDir, "lieutenant.sh"), bundle.scripts.lieutenant);
-  for (const swarm of bundle.scripts.swarm) {
-    writeFileSync(resolve(outDir, `${swarm.name}.sh`), swarm.script);
-  }
 }
 
 function printHelp() {
   console.log(`vers-fleets
 
 Usage:
-  node src/cli.js bundle [--out-dir out] [--root-name root-reef] [--lieutenant-name lieutenant-1] [--swarm-count 3]
-  node src/cli.js provision [--out-dir out] [--email you@example.com] [--force-shell-auth] [--root-name root-reef] [--lieutenant-name lieutenant-1] [--swarm-count 3]
+  node src/cli.js bundle [--out-dir out] [--root-name root-reef]
+  node src/cli.js provision [--out-dir out] [--email you@example.com] [--force-shell-auth] [--root-name root-reef]
 `);
 }
 
@@ -81,8 +69,6 @@ async function main() {
   if (args.command === "bundle") {
     const bundle = buildBootstrapBundle({
       rootName: args.rootName,
-      lieutenantName: args.lieutenantName,
-      swarmCount: args.swarmCount,
     });
     writeBundle(args.outDir, bundle);
     console.log(`Wrote vers-fleets bootstrap bundle to ${resolve(args.outDir)}`);
@@ -93,8 +79,6 @@ async function main() {
     const deployment = await provisionFleet(
       {
         rootName: args.rootName,
-        lieutenantName: args.lieutenantName,
-        swarmCount: args.swarmCount,
       },
       {
         outDir: args.outDir,

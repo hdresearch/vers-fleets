@@ -40,10 +40,11 @@ function buildRuntimeEnv(vm, topology, options = {}) {
     REEF_PARENT_VM_ID: vm.parentVmId || "",
     REEF_ROOT_VM_ID: topology.root.vmId,
     REEF_SQLITE_AUTHORITY: vm.runtime.hasSqliteAuthority ? "true" : "false",
-    REEF_ORGANS: shellQuote(vm.reefConfig.organs.join(",")),
+    REEF_SERVICES: shellQuote(vm.reefConfig.services.join(",")),
     REEF_CAPABILITIES: shellQuote(vm.reefConfig.capabilities.join(",")),
     PUNKIN_RELEASE_TAG: shellQuote(topology.sources.punkin.ref || "v1rc3"),
     PUNKIN_BIN: shellQuote(options.punkinBin || "punkin"),
+    PI_PATH: shellQuote(options.punkinBin || "punkin"),
     PI_VERS_HOME: shellQuote("/opt/pi-vers"),
   };
 
@@ -87,10 +88,10 @@ function buildActiveServicesBlock(vm) {
   return `
 rm -rf /opt/reef/services-active
 mkdir -p /opt/reef/services-active
-ACTIVE_ORGANS=${shellQuote(vm.reefConfig.organs.join(" "))}
+ACTIVE_SERVICES=${shellQuote(vm.reefConfig.services.join(" "))}
 for dir in /opt/reef/services/*/; do
   svc=$(basename "$dir")
-  if echo "$ACTIVE_ORGANS" | grep -qw "$svc"; then
+  if echo "$ACTIVE_SERVICES" | grep -qw "$svc"; then
     ln -s "../services/$svc" "/opt/reef/services-active/$svc"
   fi
 done
@@ -159,6 +160,15 @@ elif [ -x /opt/punkin-pi/packages/coding-agent/dist/cli.js ]; then
   ln -sf /opt/punkin-pi/packages/coding-agent/dist/cli.js /usr/local/bin/punkin
   chmod +x /opt/punkin-pi/packages/coding-agent/dist/cli.js
 fi
+if [ -x /usr/local/bin/punkin ]; then
+  ln -sf /usr/local/bin/punkin /usr/local/bin/pi
+fi
+
+mkdir -p /root/.pi/agent
+if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
+  "${options.punkinBin || "punkin"}" install /opt/pi-vers
+  "${options.punkinBin || "punkin"}" install /opt/reef
+fi
 
 pkill -f "bun run src/main.ts" 2>/dev/null || true
 nohup bun run src/main.ts >/tmp/reef.log 2>&1 &
@@ -183,12 +193,8 @@ export function buildBootstrapBundle(input = {}, options = {}) {
     topology,
     scripts: {
       root: buildVmScript(topology.root, topology, options),
-      lieutenant: buildVmScript(topology.lieutenant, topology, options),
-      swarm: topology.swarm.map((vm) => ({
-        name: vm.name,
-        vmId: vm.vmId,
-        script: buildVmScript(vm, topology, options),
-      })),
+      lieutenant: null,
+      swarm: [],
     },
   };
 }

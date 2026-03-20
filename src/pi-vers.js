@@ -4,7 +4,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const defaultPiVersRepo = resolve(here, "../../pi-vers");
+const defaultPiVersRepo = resolve(here, "../node_modules/@hdresearch/pi-v");
 let cachedCore = null;
 let buildPromise = null;
 
