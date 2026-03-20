@@ -172,61 +172,6 @@ async function registerRootFleetRecords(topology, authToken, fetchImpl = fetch) 
   }, fetchImpl);
 }
 
-async function registerChildFleetRecords(topology, authToken, fetchImpl = fetch) {
-  if (!topology.lieutenant && topology.swarm.length === 0) return;
-  const rootBaseUrl = publicVmUrl(topology.root.vmId);
-  const childRecords = [
-    ...(topology.lieutenant
-      ? [
-          {
-            vm: topology.lieutenant,
-            role: "lieutenant",
-          },
-        ]
-      : []),
-    ...topology.swarm.map((vm) => ({
-      vm,
-      role: "worker",
-    })),
-  ];
-
-  for (const { vm, role } of childRecords) {
-    await apiRequest(rootBaseUrl, authToken, "POST", "/vm-tree/vms", {
-      vmId: vm.vmId,
-      name: vm.name,
-      parentVmId: vm.parentVmId,
-      category: vm.category,
-      reefConfig: vm.reefConfig,
-    }, fetchImpl);
-
-    await apiRequest(rootBaseUrl, authToken, "POST", "/registry/vms", {
-      id: vm.vmId,
-      name: vm.name,
-      role,
-      address: `${vm.vmId}.vm.vers.sh`,
-      parentVmId: vm.parentVmId,
-      reefConfig: vm.reefConfig,
-      registeredBy: "vers-fleets",
-      metadata: {
-        category: vm.category,
-        publicUrl: publicVmUrl(vm.vmId),
-        sqliteAuthority: false,
-      },
-    }, fetchImpl);
-  }
-}
-
-async function registerLieutenantControlPlane(topology, authToken, fetchImpl = fetch) {
-  if (!topology.lieutenant) return;
-  const rootBaseUrl = publicVmUrl(topology.root.vmId);
-  await apiRequest(rootBaseUrl, authToken, "POST", "/lieutenant/lieutenants/register", {
-    name: topology.lieutenant.name,
-    role: "remote agent lieutenant",
-    vmId: topology.lieutenant.vmId,
-    parentAgent: topology.root.name,
-  }, fetchImpl);
-}
-
 function writeDeployment(outDir, deployment) {
   mkdirSync(outDir, { recursive: true });
   writeFileSync(resolve(outDir, "deployment.json"), `${JSON.stringify(deployment, null, 2)}\n`);
@@ -240,29 +185,17 @@ export async function provisionFleet(input = {}, options = {}) {
   const authToken = options.authToken || process.env[spec.authTokenEnv] || createAuthToken();
   const fetchImpl = options.fetchImpl || fetch;
   const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey, fetchImpl }));
-  const bootstrapChildren = input.bootstrapChildren === true;
   const rootVm = await client.createRoot(spec.rootVmConfig, true);
-  const lieutenantVm = bootstrapChildren ? await client.createRoot(spec.childVmConfig, true) : null;
-  const swarmVms = [];
-  for (let index = 0; bootstrapChildren && index < spec.swarmCount; index += 1) {
-    swarmVms.push(await client.createRoot(spec.childVmConfig, true));
-  }
 
   const topology = buildTopology({
     ...input,
-    bootstrapChildren,
     rootVmId: rootVm.vm_id,
-    lieutenantVmId: lieutenantVm?.vm_id,
-    swarmVmIds: swarmVms.map((vm) => vm.vm_id),
   });
   const rootUrl = publicVmUrl(topology.root.vmId);
   const bundle = buildBootstrapBundle(
     {
       ...input,
-      bootstrapChildren,
       rootVmId: topology.root.vmId,
-      lieutenantVmId: topology.lieutenant?.vmId,
-      swarmVmIds: topology.swarm.map((vm) => vm.vmId),
     },
     {
       rootUrl,
@@ -275,18 +208,7 @@ export async function provisionFleet(input = {}, options = {}) {
   const stageSources = options.stageSources || defaultStageSources;
   const runBootstrap = options.runBootstrap || (async (vmId, script) => client.execScript(vmId, script));
   const registerRoot = options.registerRoot || ((fleetTopology) => registerRootFleetRecords(fleetTopology, authToken, fetchImpl));
-  const registerChildren =
-    options.registerChildren || ((fleetTopology) => registerChildFleetRecords(fleetTopology, authToken, fetchImpl));
-  const registerLieutenant =
-    options.registerLieutenant || ((fleetTopology) => registerLieutenantControlPlane(fleetTopology, authToken, fetchImpl));
-
-  const nodes = [
-    { vmId: topology.root.vmId, script: bundle.scripts.root },
-    ...(topology.lieutenant && bundle.scripts.lieutenant
-      ? [{ vmId: topology.lieutenant.vmId, script: bundle.scripts.lieutenant }]
-      : []),
-    ...bundle.scripts.swarm.map((vm) => ({ vmId: vm.vmId, script: vm.script })),
-  ];
+  const nodes = [{ vmId: topology.root.vmId, script: bundle.scripts.root }];
 
   for (const node of nodes) {
     await stageSources(client, node.vmId, topology);
@@ -294,8 +216,6 @@ export async function provisionFleet(input = {}, options = {}) {
   }
 
   await registerRoot(topology);
-  await registerChildren(topology);
-  await registerLieutenant(topology);
 
   const deployment = {
     topology,
@@ -308,18 +228,8 @@ export async function provisionFleet(input = {}, options = {}) {
         vmId: topology.root.vmId,
         url: rootUrl,
       },
-      ...(topology.lieutenant
-        ? {
-            lieutenant: {
-              vmId: topology.lieutenant.vmId,
-              url: publicVmUrl(topology.lieutenant.vmId),
-            },
-          }
-        : {}),
-      swarm: topology.swarm.map((vm) => ({
-        vmId: vm.vmId,
-        url: publicVmUrl(vm.vmId),
-      })),
+      lieutenant: null,
+      swarm: [],
     },
   };
 

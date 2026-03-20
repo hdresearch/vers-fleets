@@ -7,14 +7,11 @@ test("provisionFleet bootstraps only the root by default", async () => {
   const staged = [];
   const bootstrapped = [];
   const registered = [];
-  const lieutenantRegistrations = [];
   let count = 0;
 
   const deployment = await provisionFleet(
     {
       rootName: "reef-root",
-      lieutenantName: "lt-main",
-      swarmCount: 2,
     },
     {
       ensureVersApiKey: async () => ({ apiKey: "vers-key", source: "test" }),
@@ -35,12 +32,6 @@ test("provisionFleet bootstraps only the root by default", async () => {
       registerRoot: async (topology) => {
         registered.push({ kind: "root", vmId: topology.root.vmId, parentVmId: null });
       },
-      registerChildren: async () => {
-        registered.push({ kind: "children" });
-      },
-      registerLieutenant: async (topology) => {
-        lieutenantRegistrations.push(topology.lieutenant);
-      },
     },
   );
 
@@ -51,9 +42,8 @@ test("provisionFleet bootstraps only the root by default", async () => {
   assert.equal(deployment.topology.lieutenant, null);
   assert.deepEqual(deployment.topology.swarm, []);
   assert.equal(registered[0].kind, "root");
-  assert.equal(registered[1].kind, "children");
-  assert.deepEqual(lieutenantRegistrations, [null]);
   assert.match(bootstrapped[0].script, /bootstrapping reef-root/);
   assert.equal(deployment.nodes.root.vmId, "vm-1");
+  assert.equal(deployment.nodes.lieutenant, null);
   assert.deepEqual(deployment.nodes.swarm, []);
 });

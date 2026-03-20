@@ -102,7 +102,6 @@ export SERVICES_DIR="/opt/reef/services-active"
 function buildVmScript(vm, topology, options = {}) {
   const rootUrl = options.rootUrl || remotePublicUrl(topology.root.vmId);
   const envBlock = formatEnvBlock(buildRuntimeEnv(vm, topology, { ...options, rootUrl }));
-  const isRoot = vm.vmId === topology.root.vmId;
 
   return `#!/bin/bash
 set -euo pipefail
@@ -171,7 +170,7 @@ if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
   "${options.punkinBin || "punkin"}" install /opt/reef
 fi
 
-${isRoot ? `pkill -f "bun run src/main.ts" 2>/dev/null || true
+pkill -f "bun run src/main.ts" 2>/dev/null || true
 nohup bun run src/main.ts >/tmp/reef.log 2>&1 &
 
 for i in $(seq 1 45); do
@@ -184,11 +183,7 @@ done
 
 echo "[vers-fleets] reef failed to start on ${vm.name}" >&2
 tail -50 /tmp/reef.log >&2 || true
-exit 1` : `echo "[vers-fleets] child agent ${vm.name} configured to use root reef at ${rootUrl}"
-test -x /usr/local/bin/pi
-test -d /opt/pi-vers
-test -d /opt/reef/services
-exit 0`}
+exit 1
 `;
 }
 
@@ -198,12 +193,8 @@ export function buildBootstrapBundle(input = {}, options = {}) {
     topology,
     scripts: {
       root: buildVmScript(topology.root, topology, options),
-      lieutenant: topology.lieutenant ? buildVmScript(topology.lieutenant, topology, options) : null,
-      swarm: topology.swarm.map((vm) => ({
-        name: vm.name,
-        vmId: vm.vmId,
-        script: buildVmScript(vm, topology, options),
-      })),
+      lieutenant: null,
+      swarm: [],
     },
   };
 }

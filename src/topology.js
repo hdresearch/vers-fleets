@@ -1,18 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 export const DEFAULT_ROOT_CATEGORY = "infra_vm";
-export const DEFAULT_LIEUTENANT_CATEGORY = "lieutenant";
-export const DEFAULT_SWARM_CATEGORY = "swarm_vm";
 
 function defaultRootVmConfig() {
-  return {
-    vcpu_count: 2,
-    mem_size_mib: 4096,
-    fs_size_mib: 8192,
-  };
-}
-
-function defaultChildVmConfig() {
   return {
     vcpu_count: 2,
     mem_size_mib: 4096,
@@ -135,29 +125,7 @@ export function validateSpec(input = {}) {
   if (!input || typeof input !== "object") throw new Error("spec must be an object");
 
   const rootName = typeof input.rootName === "string" && input.rootName.trim() ? input.rootName.trim() : "root-reef";
-  const lieutenantName =
-    typeof input.lieutenantName === "string" && input.lieutenantName.trim()
-      ? input.lieutenantName.trim()
-      : "lieutenant-1";
-  const swarmCount =
-    input.swarmCount === undefined ? 3 : Number.isInteger(input.swarmCount) && input.swarmCount >= 0 ? input.swarmCount : null;
-  if (swarmCount === null) throw new Error("swarmCount must be a non-negative integer");
-  const bootstrapChildren = input.bootstrapChildren === false ? false : true;
-
   const rootVmId = typeof input.rootVmId === "string" && input.rootVmId.trim() ? input.rootVmId.trim() : null;
-  const lieutenantVmId =
-    typeof input.lieutenantVmId === "string" && input.lieutenantVmId.trim() ? input.lieutenantVmId.trim() : null;
-  const swarmVmIds = Array.isArray(input.swarmVmIds)
-    ? input.swarmVmIds.map((value, index) => {
-        if (typeof value !== "string" || !value.trim()) {
-          throw new Error(`swarmVmIds[${index}] must be a non-empty string`);
-        }
-        return value.trim();
-      })
-    : [];
-  if (swarmVmIds.length > 0 && swarmVmIds.length !== swarmCount) {
-    throw new Error("swarmVmIds length must match swarmCount");
-  }
 
   const anthroKeyEnv =
     typeof input.anthropicApiKeyEnv === "string" && input.anthropicApiKeyEnv.trim()
@@ -196,13 +164,10 @@ export function validateSpec(input = {}) {
   };
 
   const rootVmConfig = normalizeVmConfig(input.rootVmConfig, "rootVmConfig", defaultRootVmConfig());
-  const childVmConfig = normalizeVmConfig(input.childVmConfig, "childVmConfig", defaultChildVmConfig());
 
   const sharedExtraDna = input.sharedExtraDna || {};
   const rootAuthorityExtraDna = input.rootAuthorityExtraDna || {};
   const rootExtraDna = input.rootExtraDna || {};
-  const lieutenantExtraDna = input.lieutenantExtraDna || {};
-  const swarmExtraDna = input.swarmExtraDna || {};
   if (sharedExtraDna.services) ensureStringArray(sharedExtraDna.services, "sharedExtraDna.services");
   if (sharedExtraDna.organs) ensureStringArray(sharedExtraDna.organs, "sharedExtraDna.organs");
   if (sharedExtraDna.capabilities) ensureStringArray(sharedExtraDna.capabilities, "sharedExtraDna.capabilities");
@@ -212,24 +177,12 @@ export function validateSpec(input = {}) {
   if (rootExtraDna.services) ensureStringArray(rootExtraDna.services, "rootExtraDna.services");
   if (rootExtraDna.organs) ensureStringArray(rootExtraDna.organs, "rootExtraDna.organs");
   if (rootExtraDna.capabilities) ensureStringArray(rootExtraDna.capabilities, "rootExtraDna.capabilities");
-  if (lieutenantExtraDna.services) ensureStringArray(lieutenantExtraDna.services, "lieutenantExtraDna.services");
-  if (lieutenantExtraDna.organs) ensureStringArray(lieutenantExtraDna.organs, "lieutenantExtraDna.organs");
-  if (lieutenantExtraDna.capabilities) ensureStringArray(lieutenantExtraDna.capabilities, "lieutenantExtraDna.capabilities");
-  if (swarmExtraDna.services) ensureStringArray(swarmExtraDna.services, "swarmExtraDna.services");
-  if (swarmExtraDna.organs) ensureStringArray(swarmExtraDna.organs, "swarmExtraDna.organs");
-  if (swarmExtraDna.capabilities) ensureStringArray(swarmExtraDna.capabilities, "swarmExtraDna.capabilities");
 
   return {
     rootName,
-    lieutenantName,
-    swarmCount,
-    bootstrapChildren,
     rootVmId,
-    lieutenantVmId,
-    swarmVmIds,
     sources,
     rootVmConfig,
-    childVmConfig,
     anthroKeyEnv,
     versKeyEnv,
     authTokenEnv,
@@ -237,8 +190,6 @@ export function validateSpec(input = {}) {
     sharedExtraDna,
     rootAuthorityExtraDna,
     rootExtraDna,
-    lieutenantExtraDna,
-    swarmExtraDna,
   };
 }
 
@@ -246,13 +197,6 @@ export function buildTopology(input = {}) {
   const spec = validateSpec(input);
 
   const rootVmId = spec.rootVmId || buildVmId("infra");
-  const lieutenantVmId = spec.bootstrapChildren ? spec.lieutenantVmId || buildVmId("lt") : null;
-  const swarmVmIds =
-    spec.bootstrapChildren && spec.swarmVmIds.length > 0
-      ? spec.swarmVmIds
-      : spec.bootstrapChildren
-        ? Array.from({ length: spec.swarmCount }, () => buildVmId("swarm"))
-        : [];
 
   const sharedOperationalProfile = mergeDna(defaultSharedOperationalDna(), spec.sharedExtraDna);
   const rootAuthorityOverlay = mergeDna(defaultRootAuthorityOverlayDna(), spec.rootAuthorityExtraDna);
@@ -269,34 +213,6 @@ export function buildTopology(input = {}) {
     vmConfig: spec.rootVmConfig,
   });
 
-  const lieutenant = lieutenantVmId
-    ? makeRecord({
-        vmId: lieutenantVmId,
-        name: spec.lieutenantName,
-        parentVmId: rootVmId,
-        category: DEFAULT_LIEUTENANT_CATEGORY,
-        reefConfig: mergeDna(sharedOperationalProfile, spec.lieutenantExtraDna),
-        hasSqliteAuthority: false,
-        harness: "punkin",
-        reefRole: "child",
-        vmConfig: spec.childVmConfig,
-      })
-    : null;
-
-  const swarm = swarmVmIds.map((vmId, index) =>
-    makeRecord({
-      vmId,
-      name: `swarm-${index + 1}`,
-      parentVmId: lieutenantVmId || rootVmId,
-      category: DEFAULT_SWARM_CATEGORY,
-      reefConfig: mergeDna(sharedOperationalProfile, spec.swarmExtraDna),
-      hasSqliteAuthority: false,
-      harness: "punkin",
-      reefRole: "child",
-      vmConfig: spec.childVmConfig,
-    }),
-  );
-
   return {
     version: 1,
     semantics: {
@@ -304,12 +220,11 @@ export function buildTopology(input = {}) {
       snapshotsInBootstrap: false,
       rootOwnsSqlite: true,
       childVmMayBecomeParentLater: true,
-      bootstrapChildren: spec.bootstrapChildren,
     },
     profiles: {
       sharedOperational: sharedOperationalProfile,
       rootAuthorityOverlay,
-      inheritanceRule: "lieutenant and swarm inherit the shared operational profile; only the root applies the authority overlay",
+      inheritanceRule: "runtime child VMs inherit the shared operational profile; only the root applies the authority overlay",
     },
     sources: spec.sources,
     env: {
@@ -319,7 +234,7 @@ export function buildTopology(input = {}) {
       versInfraUrlEnv: spec.infraUrlEnv,
     },
     root,
-    lieutenant,
-    swarm,
+    lieutenant: null,
+    swarm: [],
   };
 }
