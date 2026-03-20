@@ -448,6 +448,7 @@ export async function provisionFleet(input = {}, options = {}) {
   const deployment = {
     topology,
     auth: {
+      versApiKey: auth.apiKey,
       versApiKeySource: auth.source,
       versAuthToken: authToken,
       llmProxyKey: llmProxy.key,

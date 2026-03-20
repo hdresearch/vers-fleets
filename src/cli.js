@@ -115,8 +115,9 @@ async function main() {
     );
     console.log(`\nRoot image committed: ${result.commitId}`);
     console.log(`VERS_API_KEY used: ${result.versApiKey}`);
-    console.log(`\nTo make this image public, run:`);
-    console.log(`  VERS_API_KEY=${result.versApiKey} curl -X PATCH https://api.vers.sh/api/v1/commits/${result.commitId} \\`);
+    console.log(`\nSave this VERS_API_KEY — you need it to manage this commit (toggle public, SSH into VMs, etc.)`);
+    console.log(`\nTo make this image public:`);
+    console.log(`  curl -X PATCH https://api.vers.sh/api/v1/commits/${result.commitId} \\`);
     console.log(`    -H "Authorization: Bearer ${result.versApiKey}" -H "Content-Type: application/json" \\`);
     console.log(`    -d '{"is_public": true}'`);
     console.log(`\nTo provision from this image:`);
@@ -137,8 +138,9 @@ async function main() {
     );
     console.log(`\nGolden image committed: ${result.commitId}`);
     console.log(`VERS_API_KEY used: ${result.versApiKey}`);
-    console.log(`\nTo make this image public, run:`);
-    console.log(`  VERS_API_KEY=${result.versApiKey} curl -X PATCH https://api.vers.sh/api/v1/commits/${result.commitId} \\`);
+    console.log(`\nSave this VERS_API_KEY — you need it to manage this commit (toggle public, SSH into VMs, etc.)`);
+    console.log(`\nTo make this image public:`);
+    console.log(`  curl -X PATCH https://api.vers.sh/api/v1/commits/${result.commitId} \\`);
     console.log(`    -H "Authorization: Bearer ${result.versApiKey}" -H "Content-Type: application/json" \\`);
     console.log(`    -d '{"is_public": true}'`);
     console.log(`\nTo provision with this golden image:`);
@@ -159,7 +161,9 @@ async function main() {
         goldenCommitId: args.goldenCommitId || undefined,
       },
     );
-    console.log(`Provisioned vers-fleets topology. Root reef is ${deployment.nodes.root.url}`);
+    console.log(`\nProvisioned vers-fleets topology. Root reef is ${deployment.nodes.root.url}`);
+    console.log(`VERS_API_KEY used: ${deployment.auth.versApiKey}`);
+    console.log(`\nSave this VERS_API_KEY — you need it to SSH into VMs and manage commits from this run.`);
     console.log(`Wrote deployment manifest to ${resolve(args.outDir, "deployment.json")}`);
     return;
   }
