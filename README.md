@@ -1,4 +1,79 @@
-# vers-fleets
+# Vers-Fleets Onboarding
+
+If you are directing a coding agent, tell it to use this repo as the entry point for provisioning a root Vers fleet from public sources only.
+
+Use:
+
+- `reef` from GitHub `main`
+- `pi-vers` from GitHub `main`
+- `punkin-pi` pinned to `https://github.com/hdresearch/punkin-pi/releases/tag/v1rc3`
+
+Do not assume sibling local repos exist. Do not use `../reef`, `../pi-vers`, or `../punkin-pi`.
+
+## Agent Instructions
+
+1. Clone the repo and install dependencies:
+
+```bash
+git clone https://github.com/hdresearch/vers-fleets.git
+cd vers-fleets
+npm install
+```
+
+2. Choose one auth path:
+
+Shell auth:
+
+```bash
+node src/cli.js provision --out-dir out/live --email you@example.com --force-shell-auth
+```
+
+Vers API key:
+
+```bash
+export VERS_API_KEY=your_vers_api_key
+node src/cli.js provision --out-dir out/live
+```
+
+3. Expect this repo to:
+
+- create a fresh root Reef infra VM
+- bootstrap that root VM from public `main` branches of `reef` and `pi-vers`
+- pin `punkin-pi` to `v1rc3`
+- write `out/live/deployment.json` with the root VM id, root Reef URL, and auth token
+
+4. Do not create child lieutenants or worker VMs here.
+
+- `vers-fleets` bootstraps only the root Reef VM
+- child VMs are created later by Reef runtime flows
+- those child VMs come from Reef golden-image flows
+
+## Quickstart
+
+```bash
+git clone https://github.com/hdresearch/vers-fleets.git
+cd vers-fleets
+npm install
+node src/cli.js provision --out-dir out/live --email you@example.com --force-shell-auth
+```
+
+Or:
+
+```bash
+git clone https://github.com/hdresearch/vers-fleets.git
+cd vers-fleets
+npm install
+export VERS_API_KEY=your_vers_api_key
+node src/cli.js provision --out-dir out/live
+```
+
+The deployment manifest will be written to:
+
+```bash
+out/live/deployment.json
+```
+
+## Repo Overview
 
 Unified bootstrap for `reef + pi-vers + punkin-pi`.
 
@@ -47,12 +122,12 @@ This is intentionally flexible so child VMs can become parents later.
 This repo now does both:
 
 - `bundle`: generate the root topology and root bootstrap script
-- `provision`: run Vers shell-auth if needed, create a fresh root VM, stage local `reef` and `pi-vers`, clone public `punkin-pi` at `v1rc3`, bootstrap root Reef, and register lineage in the root reef
+- `provision`: run Vers shell-auth if needed, create a fresh root VM, clone public `reef` and `pi-vers` from `main`, clone public `punkin-pi` at `v1rc3`, bootstrap root Reef, and register lineage in the root reef
 
 Default source strategy:
 
-- `reef`: local workspace upload
-- `pi-vers`: local workspace upload
+- `reef`: public GitHub `main`
+- `pi-vers`: public GitHub `main`
 - `punkin-pi`: public git source pinned to tag `v1rc3`
 
 The provisioning path in this repo now calls into `pi-vers` for shell-auth and Vers VM transport instead of carrying a separate duplicate implementation.
