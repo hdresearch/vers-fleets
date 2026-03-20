@@ -35,14 +35,20 @@ export VERS_API_KEY=your_vers_api_key
 node src/cli.js provision --out-dir out/live
 ```
 
-3. Expect this repo to:
+3. Ensure an Anthropic API key is available for the resulting Reef runtime.
+
+- If `ANTHROPIC_API_KEY` is already present in the shell, use it.
+- Tell the user that you used `ANTHROPIC_API_KEY` from the current shell.
+- If it is not present, stop and ask the user to provide one before continuing.
+
+4. Expect this repo to:
 
 - create a fresh root Reef infra VM
 - bootstrap that root VM from public `main` branches of `reef` and `pi-vers`
 - pin `punkin-pi` to `v1rc3`
 - write `out/live/deployment.json` with the root VM id, root Reef URL, and auth token
 
-4. Do not create child lieutenants or worker VMs here.
+5. Do not create child lieutenants or worker VMs here.
 
 - `vers-fleets` bootstraps only the root Reef VM
 - child VMs are created later by Reef runtime flows
