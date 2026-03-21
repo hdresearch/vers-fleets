@@ -57,6 +57,7 @@ export function buildRuntimeEnv(vm, topology, options = {}) {
     PUNKIN_BIN: shellQuote(options.punkinBin || "punkin"),
     PI_PATH: shellQuote(options.punkinBin || "punkin"),
     PI_VERS_HOME: shellQuote("/opt/pi-vers"),
+    SERVICES_DIR: shellQuote("/opt/reef/services-active"),
   };
 
   if (options.goldenCommitId && String(options.goldenCommitId).trim()) {
@@ -225,9 +226,17 @@ set +a
 
 ${buildActiveServicesBlock(vm)}
 
+# Install punkin extensions with runtime env available (SERVICES_DIR, LLM_PROXY_KEY, etc.)
+mkdir -p /root/.punkin/agent /root/.pi/agent
+if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
+  "${options.punkinBin || "punkin"}" install /opt/pi-vers 2>/dev/null || true
+  "${options.punkinBin || "punkin"}" install /opt/reef 2>/dev/null || true
+fi
+
 cd /opt/reef
 pkill -f "bun run src/main.ts" 2>/dev/null || true
-nohup bun run src/main.ts >/tmp/reef.log 2>&1 &
+tmux kill-session -t reef 2>/dev/null || true
+tmux new-session -d -s reef "set -a; source /opt/reef/.env; set +a; export PATH=/root/.bun/bin:\$PATH; cd /opt/reef; bun run src/main.ts >> /tmp/reef.log 2>&1"
 
 for i in $(seq 1 45); do
   if curl -sf http://localhost:3000/health >/dev/null 2>&1; then
