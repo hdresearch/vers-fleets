@@ -173,23 +173,23 @@ for pkg_root in /opt/pi-vers /opt/reef; do
   ln -sfn /opt/punkin-pi/packages/agent "$pkg_root/node_modules/@mariozechner/pi-agent-core"
 done
 
+# Create a wrapper script for punkin that uses bun and resolves paths correctly.
+# Direct symlinks break because bun resolves relative imports from the symlink location.
 if [ -x /opt/punkin-pi/builds/punkin ]; then
-  ln -sf /opt/punkin-pi/builds/punkin /usr/local/bin/punkin
+  cat > /usr/local/bin/punkin <<'WRAPPER'
+#!/usr/bin/env bun
+import { main } from "/opt/punkin-pi/builds/punkin";
+WRAPPER
 elif [ -x /opt/punkin-pi/packages/coding-agent/dist/cli.js ]; then
-  ln -sf /opt/punkin-pi/packages/coding-agent/dist/cli.js /usr/local/bin/punkin
-  chmod +x /opt/punkin-pi/packages/coding-agent/dist/cli.js
+  cat > /usr/local/bin/punkin <<'WRAPPER'
+#!/bin/sh
+exec bun /opt/punkin-pi/packages/coding-agent/dist/cli.js "$@"
+WRAPPER
 fi
+chmod +x /usr/local/bin/punkin 2>/dev/null || true
 if [ -x /usr/local/bin/punkin ]; then
   ln -sf /usr/local/bin/punkin /usr/local/bin/pi
 fi
-
-# Patch punkin shebang to use bun instead of node.
-# Reef services use bun:sqlite which requires the bun runtime.
-for f in /usr/local/bin/punkin /opt/punkin-pi/packages/coding-agent/dist/cli.js /opt/punkin-pi/builds/punkin; do
-  if [ -f "$f" ] && head -1 "$f" | grep -q "#!/usr/bin/env node"; then
-    sed -i '1s|#!/usr/bin/env node|#!/usr/bin/env bun|' "$f"
-  fi
-done
 
 mkdir -p /root/.punkin/agent /root/.pi/agent
 if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
