@@ -37,6 +37,15 @@ export function buildRuntimeEnv(vm, topology, options = {}) {
         : process.env.LLM_PROXY_KEY
           ? shellQuote(process.env.LLM_PROXY_KEY)
           : "",
+    // Punkin-pi's AI package requires ANTHROPIC_API_KEY at startup before
+    // the vers provider is selected via set_model. Alias it to LLM_PROXY_KEY
+    // so the Anthropic SDK initializes with the vers proxy key.
+    ANTHROPIC_API_KEY:
+      options.llmProxyKey && String(options.llmProxyKey).trim()
+        ? shellQuote(options.llmProxyKey)
+        : process.env.LLM_PROXY_KEY
+          ? shellQuote(process.env.LLM_PROXY_KEY)
+          : "",
     REEF_ROLE: vm.runtime.reefRole,
     REEF_CATEGORY: vm.category,
     REEF_PARENT_VM_ID: vm.parentVmId || "",
