@@ -436,6 +436,7 @@ export async function provisionFleet(input = {}, options = {}) {
       versApiKey: auth.apiKey,
       versAuthToken: authToken,
       llmProxyKey: llmProxy.key,
+      rootCommitId,
       goldenCommitId,
     });
     const runBootstrap = options.runBootstrap || (async (vmId, script) => client.execScript(vmId, script));

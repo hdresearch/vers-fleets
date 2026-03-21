@@ -60,6 +60,9 @@ export function buildRuntimeEnv(vm, topology, options = {}) {
     SERVICES_DIR: shellQuote("/opt/reef/services-active"),
   };
 
+  if (options.rootCommitId && String(options.rootCommitId).trim()) {
+    env.VERS_ROOT_COMMIT_ID = shellQuote(options.rootCommitId);
+  }
   if (options.goldenCommitId && String(options.goldenCommitId).trim()) {
     env.VERS_GOLDEN_COMMIT_ID = shellQuote(options.goldenCommitId);
   }
