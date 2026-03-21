@@ -1,201 +1,170 @@
-# Vers-Fleets Onboarding
+# vers-fleets
 
-If you are directing a coding agent, tell it to use this repo as the entry point for provisioning a root Vers fleet from public sources only.
+Provisioning and image management for reef fleets on Vers infrastructure.
 
-Use:
+Three commands:
 
-- `reef` from GitHub `main`
-- `pi-vers` from GitHub `main`
-- `punkin-pi` pinned to `https://github.com/hdresearch/punkin-pi/releases/tag/w%2Frouter`
-
-Do not assume sibling local repos exist. Do not use `../reef`, `../pi-vers`, or `../punkin-pi`.
-
-## Agent Instructions
-
-1. Clone the repo and install dependencies:
-
-```bash
-git clone https://github.com/hdresearch/vers-fleets.git
-cd vers-fleets
-npm install
-```
-
-2. Choose one auth path:
-
-Shell auth:
-
-```bash
-node src/cli.js provision --out-dir out/live --email you@example.com --force-shell-auth
-```
-
-Vers API key:
-
-```bash
-export VERS_API_KEY=your_vers_api_key
-node src/cli.js provision --out-dir out/live
-```
-
-3. Ensure a valid `VERS_API_KEY` is available for provisioning.
-
-- `vers-fleets` now exchanges that raw Vers platform key against `https://tokens.vers.sh/v1/keys/exchange`
-- the returned `sk-vers-*` key becomes `LLM_PROXY_KEY` for the root Reef runtime and all child agent VMs
-- do not ask for or wire any separate provider API key
-- if the exchange health check or key exchange fails, stop and report that directly
-
-4. Expect this repo to:
-
-- create a fresh root Reef infra VM
-- bootstrap that root VM from public `main` branches of `reef` and `pi-vers`
-- pin `punkin-pi` to `w/router`
-- write `out/live/deployment.json` with the root VM id, root Reef URL, and auth token
-
-5. After provisioning succeeds and the root Reef health check is good, automatically generate a magic-link login URL for the user.
-
-- Read the root Reef URL and auth token from `out/live/deployment.json`
-- Call the root Reef magic-link endpoint
-- Return the full login URL the user can paste into a browser
-- Also tell the user: `Your link expires in X minutes`
-- Compute `X` from the actual expiration timestamp returned by the API, not a guess
-
-Example flow:
-
-```bash
-ROOT_URL="$(node -e 'const d=require("./out/live/deployment.json"); console.log(d.nodes.root.url)')"
-VERS_AUTH_TOKEN="$(node -e 'const d=require("./out/live/deployment.json"); console.log(d.auth.versAuthToken)')"
-
-curl -sk -X POST "$ROOT_URL/auth/magic-link" \
-  -H "Authorization: Bearer $VERS_AUTH_TOKEN"
-```
-
-6. After the magic link is generated, persist the `VERS_API_KEY` on the user's local machine.
-
-- If the Vers API key came from shell auth or was provided directly by the user, store it under `~/.vers` in the user's home directory.
-- Create `~/.vers` if it does not already exist.
-- If the same `VERS_API_KEY` is already stored there, do not rewrite it.
-- Tell the user whether you stored the key or detected that the existing stored key already matched.
-- If creating `~/.vers` or writing the key fails, tell the user plainly that you were trying to save the API key somewhere safe on their computer so future Vers setup can reuse it automatically.
-- If that save fails, explain the failure in simple language rather than assuming the user is technical.
-
-7. Do not create child lieutenants or worker VMs here.
-
-- `vers-fleets` bootstraps only the root Reef VM
-- child VMs are created later by Reef runtime flows
-- those child VMs come from Reef golden-image flows
+- **`provision`** — Spawn a root reef VM from pre-built commits (fast onboarding)
+- **`build-root`** — Build a root reef image and commit it (no secrets baked in)
+- **`build-golden`** — Build a golden agent image and commit it (no secrets baked in)
 
 ## Quickstart
 
-```bash
-git clone https://github.com/hdresearch/vers-fleets.git
-cd vers-fleets
-npm install
-node src/cli.js provision --out-dir out/live --email you@example.com --force-shell-auth
-```
-
-Or:
+Standard user onboarding from public commits:
 
 ```bash
-git clone https://github.com/hdresearch/vers-fleets.git
-cd vers-fleets
-npm install
-export VERS_API_KEY=your_vers_api_key
-node src/cli.js provision --out-dir out/live
+# With VERS_API_KEY in your environment (e.g. .zshrc)
+node src/cli.js provision --root-commit <root-id> --golden-commit <golden-id>
+
+# Or with shell-auth
+node src/cli.js provision --root-commit <root-id> --golden-commit <golden-id> --email you@example.com
 ```
 
-The deployment manifest will be written to:
+## Auth
+
+All commands require authentication via one of:
+
+1. `VERS_API_KEY` environment variable (e.g. set in `.zshrc`)
+2. `--email` flag for interactive shell-auth
+
+Users returning to an existing reef or managing commits should use their saved `VERS_API_KEY`.
+
+## Commands
+
+### `provision`
+
+Spawn a root reef VM from pre-built commits and configure it with your keys.
 
 ```bash
-out/live/deployment.json
+node src/cli.js provision --root-commit <id> --golden-commit <id> [--email you@example.com]
 ```
 
-## Repo Overview
+Required flags:
+- `--root-commit <id>` — Commit ID of the root reef image
+- `--golden-commit <id>` — Commit ID of the golden agent image
 
-Unified bootstrap for `reef + pi-vers + punkin-pi`.
+What happens:
+1. Authenticates (env key or shell-auth)
+2. Exchanges `VERS_API_KEY` for an `LLM_PROXY_KEY` via `tokens.vers.sh`
+3. Restores a VM from the root commit
+4. Injects secrets (`VERS_API_KEY`, `LLM_PROXY_KEY`, `VERS_AUTH_TOKEN`, `VERS_GOLDEN_COMMIT_ID`) into `/opt/reef/.env`
+5. Starts reef, waits for health check
+6. Registers the root in reef's vm-tree and registry
+7. Writes `deployment.json` with VM ID, URL, and auth
 
-Architecture split:
+The root reef will use the golden commit to spawn all agent VMs (lieutenants, swarm workers, single agents).
 
-- `pi-vers` remains the Vers substrate: shell-auth, VM API, SSH transport, and related infra interaction specs
-- `reef` owns registry, lieutenants, lineage, and module/service distribution
-- `punkin-pi` is the harness/plugin carried on the root, lieutenant, and swarm VMs
+### `build-root`
 
-Pinned harness release for V1:
-
-- `punkin-pi` tag: `w/router`
-- source: `https://github.com/hdresearch/punkin-pi/releases/tag/w%2Frouter`
-
-## V1 Topology
-
-V1 does **not** use Vers snapshots during bootstrap. It creates a fresh root VM and records lineage in the root reef authority. Child lieutenants and worker VMs are created later from Reef runtime flows.
-
-Topology:
-
-1. Root `infra_vm`
-   - runs `reef`
-   - runs `punkin`
-   - owns the SQLite-backed lineage/registry authority
-2. Lieutenant and worker VMs are created later from the root Reef runtime
-   - they are not bootstrapped by `vers-fleets`
-   - they use `punkin` as the harness
-   - they point back to the root Reef instead of running their own Reef node
-
-All lineage and VM DNA writes go back to the root reef through reef modules.
-
-VM DNA fields:
-
-- `vm_id`
-- `name`
-- `parent_vm_id` nullable
-- `category`
-- `reef_config`
-  - `services`
-  - `capabilities`
-
-This is intentionally flexible so child VMs can become parents later.
-
-## What Exists
-
-This repo now does both:
-
-- `bundle`: generate the root topology and root bootstrap script
-- `provision`: run Vers shell-auth if needed, create a fresh root VM, clone public `reef` and `pi-vers` from `main`, clone public `punkin-pi` at `w/router`, bootstrap root Reef, and register lineage in the root reef
-
-Default source strategy:
-
-- `reef`: public GitHub `main`
-- `pi-vers`: public GitHub `main`
-- `punkin-pi`: public git source pinned to tag `w/router`
-
-The provisioning path in this repo now calls into `pi-vers` for shell-auth and Vers VM transport instead of carrying a separate duplicate implementation.
-
-## Usage
+Build a root reef image and commit it. No secrets are baked in — the image contains reef, pi-vers, punkin-pi, and all dependencies pre-built.
 
 ```bash
-node src/cli.js bundle --out-dir out
+# Private build — keep VM alive for testing
+node src/cli.js build-root --private [--email you@example.com]
+
+# Public build — publish immediately, delete builder VM
+node src/cli.js build-root --public [--email you@example.com]
 ```
 
-Outputs:
+Required flags:
+- `--public` or `--private`
 
-- `out/topology.json`
-- `out/root.sh`
+What happens:
+1. Creates a fresh VM from the Vers base image
+2. Installs system deps (node 22, bun)
+3. Clones reef, pi-vers, punkin-pi from GitHub `main`
+4. Builds all packages, cross-links punkin, installs CLI
+5. Commits the VM as a snapshot (no secrets on disk)
+6. `--public`: PATCHes the commit to `is_public: true`, deletes builder VM
+7. `--private`: Keeps builder VM alive, returns VM ID for SSH testing
+
+### `build-golden`
+
+Build a golden agent image for child VMs (lieutenants, swarm workers, all agent types). No secrets or instance-specific URLs are baked in.
 
 ```bash
-node src/cli.js provision --out-dir out --email you@example.com --force-shell-auth
+# Private build
+node src/cli.js build-golden --private --reef-path ./reef --pi-vers-path ./pi-vers
+
+# Public build
+node src/cli.js build-golden --public --reef-path ./reef --pi-vers-path ./pi-vers
 ```
 
-Provision writes `out/deployment.json` with the created VM IDs and public URLs.
+Required flags:
+- `--public` or `--private`
+- `--reef-path <path>` — Local reef directory to upload
+- `--pi-vers-path <path>` — Local pi-vers directory to upload
+
+What happens:
+1. Creates a fresh VM
+2. Uploads reef and pi-vers sources
+3. Clones punkin-pi from GitHub `main`, builds everything
+4. Sets up agent runtime (punkin CLI, service symlinks, profile.d env hooks)
+5. Commits the VM (secret-free snapshot)
+6. `--public`/`--private` behavior same as `build-root`
+
+## Architecture
+
+### Two images, two commits
+
+| Image | Built by | Used for | Contains |
+|-------|----------|----------|----------|
+| Root commit | `build-root` | Root reef VM (orchestrator) | reef server + all services + pi-vers + punkin |
+| Golden commit | `build-golden` | All agent VMs (lieutenants, swarm, single agents) | Agent runtime + punkin CLI + reef extensions |
+
+Both are Vers **commits** (VM snapshots), not base images. They're made public via `PATCH /api/v1/commits/{id}` with `{"is_public": true}`.
+
+### Secret injection (post-spawn, never baked in)
+
+Secrets are injected at spawn time, not build time. Both images are safe to make public.
+
+| Secret | Where injected | Cascades to children? |
+|--------|---------------|----------------------|
+| `VERS_API_KEY` | `/opt/reef/.env` (root), `reef-agent.sh` (children) | Yes |
+| `LLM_PROXY_KEY` | `/opt/reef/.env` (root), `reef-agent.sh` (children) | Yes |
+| `VERS_AUTH_TOKEN` | `/opt/reef/.env` (root), SSH env (children) | Yes |
+| `VERS_INFRA_URL` | `/opt/reef/.env` (root), `reef-agent.sh` (children) | Yes |
+| `VERS_GOLDEN_COMMIT_ID` | `/opt/reef/.env` (root), `reef-agent.sh` (children) | Yes |
+
+### Source repos
+
+- **reef** — `https://github.com/hdresearch/reef.git` `main`
+- **pi-vers** — `https://github.com/hdresearch/pi-vers.git` `main`
+- **punkin-pi** — `https://github.com/hdresearch/punkin-pi.git` `main`
+
+### Topology
+
+Root reef VM:
+- Runs the reef HTTP server with all services (lieutenant, commits, registry, vm-tree, etc.)
+- Owns the SQLite-backed lineage/registry authority
+- Spawns all child VMs from the golden commit
+
+Child agent VMs (from golden commit):
+- Run punkin in RPC mode (no reef server)
+- Point back to root reef via `VERS_INFRA_URL`
+- Inherit `VERS_API_KEY` and `VERS_GOLDEN_COMMIT_ID` so they can spawn their own sub-agents
+
+## Vers Platform API
+
+Commits are managed via the Vers orchestrator API at `https://api.vers.sh/api/v1`:
+
+- `GET /commits` — List your own commits
+- `GET /commits/public` — List all public commits
+- `PATCH /commits/{id}` — Toggle `is_public` (owner only)
+- `POST /vm/from_commit` — Restore a VM from a commit (public or owned)
+- `POST /vm/{id}/commit` — Snapshot a VM into a commit
 
 ## Development
 
 ```bash
+npm install
 npm test
-node src/cli.js bundle --out-dir out
 ```
 
-## Design Notes
+## Optional flags
 
-- Bootstrap semantics are `fresh_vms_only`
-- `snapshotsInBootstrap` is always `false`
-- root reef is the only SQLite authority in the topology
-- child VMs use `punkin` as the harness
-- child/root bootstrap pins `punkin-pi` to `w/router` by default
-- reef service selection remains expressible via VM DNA
-- runtime child VMs are created later from Reef golden-image flows, not from this repo
+| Flag | Commands | Default | Description |
+|------|----------|---------|-------------|
+| `--out-dir <dir>` | all | `out` | Output directory for manifests |
+| `--root-name <name>` | provision, build-root | `root-reef` | Name for the root VM |
+| `--force-shell-auth` | all | `false` | Force browser-based shell auth even if VERS_API_KEY is set |
