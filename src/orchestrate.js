@@ -232,7 +232,17 @@ export async function buildRoot(input = {}, options = {}) {
     : await ensurePiVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true });
   const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey }));
 
-  const topology = buildTopology(input);
+  // Support local workspace sources via --reef-path / --pi-vers-path
+  const sources = {};
+  if (options.reefPath) {
+    sources.reef = { type: "workspace", repoPath: resolve(options.reefPath) };
+  }
+  if (options.piVersPath) {
+    sources.piVers = { type: "workspace", repoPath: resolve(options.piVersPath) };
+  }
+  const topoInput = { ...input, ...(Object.keys(sources).length > 0 ? { sources } : {}) };
+
+  const topology = buildTopology(topoInput);
   const imageScript = buildImageScript(topology, {});
 
   console.log("[vers-fleets] Creating VM for root image build...");

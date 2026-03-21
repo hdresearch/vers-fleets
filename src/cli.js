@@ -82,6 +82,7 @@ Usage:
                                [--force-shell-auth] [--root-name root-reef] [--out-dir out]
   bun src/cli.js build-root   --public | --private [--email you@example.com]
                                [--force-shell-auth] [--root-name root-reef] [--out-dir out]
+                               [--reef-path <path>] [--pi-vers-path <path>]
   bun src/cli.js build-golden --public | --private --reef-path <path> --pi-vers-path <path>
                                [--email you@example.com] [--force-shell-auth] [--out-dir out]
 
@@ -98,8 +99,8 @@ Flags:
   --private      Keep the commit private and the builder VM alive for testing/SSH
   --root-commit  Commit ID of a pre-built root reef image (required for provision)
   --golden-commit Commit ID of a pre-built golden agent image (required for provision)
-  --reef-path    Path to local reef directory (required for build-golden)
-  --pi-vers-path Path to local pi-vers directory (required for build-golden)
+  --reef-path    Path to local reef directory (required for build-golden, optional for build-root)
+  --pi-vers-path Path to local pi-vers directory (required for build-golden, optional for build-root)
 `);
 }
 
@@ -124,6 +125,8 @@ async function main() {
         email: args.email || undefined,
         forceShellAuth: args.forceShellAuth,
         makePublic: args.visibility === "public",
+        reefPath: args.reefPath || undefined,
+        piVersPath: args.piVersPath || undefined,
       },
     );
 
