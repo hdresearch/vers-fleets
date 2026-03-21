@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 export const DEFAULT_ROOT_CATEGORY = "infra_vm";
-export const DEFAULT_PUNKIN_RELEASE_TAG = "main";
+export const DEFAULT_PUNKIN_RELEASE_TAG = "carter/punkin/v1_rc5";
 
 function defaultRootVmConfig() {
   return {

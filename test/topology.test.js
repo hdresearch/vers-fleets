@@ -11,7 +11,7 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.semantics.bootstrapMode, "fresh_vms_only");
   assert.equal(topology.semantics.snapshotsInBootstrap, false);
   assert.equal(topology.semantics.rootOwnsSqlite, true);
-  assert.equal(topology.sources.punkin.ref, "main");
+  assert.equal(topology.sources.punkin.ref, "carter/punkin/v1_rc5");
   assert.equal(topology.sources.punkin.type, "git");
   assert.equal(topology.sources.reef.type, "git");
   assert.equal(topology.sources.reef.ref, "main");
@@ -40,8 +40,8 @@ test("buildBootstrapBundle emits git-based root bootstrap script", () => {
   assert.match(bundle.scripts.root, /git checkout 'main'/);
   assert.match(bundle.scripts.root, /git clone 'https:\/\/github.com\/hdresearch\/pi-vers\.git' '\/opt\/src\/pi-vers'/);
   assert.match(bundle.scripts.root, /git clone 'https:\/\/github.com\/hdresearch\/punkin-pi\.git' '\/opt\/src\/punkin-pi'/);
-  assert.match(bundle.scripts.root, /git rev-parse --verify -q 'refs\/tags\/main' >/);
-  assert.match(bundle.scripts.root, /git -c advice\.detachedHead=false checkout --detach 'refs\/tags\/main'/);
+  assert.match(bundle.scripts.root, /git rev-parse --verify -q 'refs\/tags\/carter\/punkin\/v1_rc5' >/);
+  assert.match(bundle.scripts.root, /git -c advice\.detachedHead=false checkout --detach 'refs\/tags\/carter\/punkin\/v1_rc5'/);
   assert.match(bundle.scripts.root, /setup_22\.x/);
   assert.match(bundle.scripts.root, /HUSKY=0 npm install/);
   assert.match(bundle.scripts.root, /PI_PATH='punkin'/);
@@ -50,7 +50,7 @@ test("buildBootstrapBundle emits git-based root bootstrap script", () => {
   assert.match(bundle.scripts.root, /"punkin" install \/opt\/pi-vers/);
   assert.match(bundle.scripts.root, /"punkin" install \/opt\/reef/);
   assert.match(bundle.scripts.root, /SERVICES_DIR="\/opt\/reef\/services-active"/);
-  assert.match(bundle.scripts.root, /PUNKIN_RELEASE_TAG='main'/);
+  assert.match(bundle.scripts.root, /PUNKIN_RELEASE_TAG='carter\/punkin\/v1_rc5'/);
   assert.equal(bundle.scripts.lieutenant, null);
   assert.deepEqual(bundle.scripts.swarm, []);
 });
