@@ -183,6 +183,14 @@ if [ -x /usr/local/bin/punkin ]; then
   ln -sf /usr/local/bin/punkin /usr/local/bin/pi
 fi
 
+# Patch punkin shebang to use bun instead of node.
+# Reef services use bun:sqlite which requires the bun runtime.
+for f in /usr/local/bin/punkin /opt/punkin-pi/packages/coding-agent/dist/cli.js /opt/punkin-pi/builds/punkin; do
+  if [ -f "$f" ] && head -1 "$f" | grep -q "#!/usr/bin/env node"; then
+    sed -i '1s|#!/usr/bin/env node|#!/usr/bin/env bun|' "$f"
+  fi
+done
+
 mkdir -p /root/.punkin/agent /root/.pi/agent
 if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
   "${options.punkinBin || "punkin"}" install /opt/pi-vers
