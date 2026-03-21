@@ -249,16 +249,26 @@ export async function buildRoot(input = {}, options = {}) {
     console.log("[vers-fleets] Committing root image...");
     const committed = await client.commit(vmId, true);
 
-    console.log("[vers-fleets] Cleaning up builder VM...");
-    try {
-      await client.delete(vmId);
-    } catch {
-      // Commit is durable; deletion is best-effort
+    if (options.makePublic) {
+      console.log("[vers-fleets] Making commit public...");
+      await client.setCommitPublic(committed.commit_id, true);
+    }
+
+    if (options.makePublic) {
+      console.log("[vers-fleets] Cleaning up builder VM...");
+      try {
+        await client.delete(vmId);
+      } catch {
+        // Commit is durable; deletion is best-effort
+      }
+    } else {
+      console.log(`[vers-fleets] Builder VM kept alive: ${vmId}`);
     }
 
     const result = {
       commitId: committed.commit_id,
       vmId,
+      isPublic: !!options.makePublic,
       versApiKey: auth.apiKey,
       versApiKeySource: auth.source,
     };
@@ -327,16 +337,26 @@ export async function buildGolden(input = {}, options = {}) {
     console.log("[vers-fleets] Committing golden image...");
     const committed = await client.commit(vmId, true);
 
-    console.log("[vers-fleets] Cleaning up builder VM...");
-    try {
-      await client.delete(vmId);
-    } catch {
-      // Commit is durable
+    if (options.makePublic) {
+      console.log("[vers-fleets] Making commit public...");
+      await client.setCommitPublic(committed.commit_id, true);
+    }
+
+    if (options.makePublic) {
+      console.log("[vers-fleets] Cleaning up builder VM...");
+      try {
+        await client.delete(vmId);
+      } catch {
+        // Commit is durable
+      }
+    } else {
+      console.log(`[vers-fleets] Builder VM kept alive: ${vmId}`);
     }
 
     const result = {
       commitId: committed.commit_id,
       vmId,
+      isPublic: !!options.makePublic,
       versApiKey: auth.apiKey,
       versApiKeySource: auth.source,
     };
