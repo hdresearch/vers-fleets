@@ -172,15 +172,10 @@ async function materializeWorkspaceSource(source) {
 
 async function defaultStageSources(client, vmId, topology) {
   for (const source of stageableSources(topology)) {
-    const materialized = await materializeWorkspaceSource({
-      repoPath: source.localPath,
-      ref: topology.sources[source.name].ref,
-    });
-    try {
-      await client.uploadDirectory(vmId, materialized.path, source.remotePath);
-    } finally {
-      materialized.cleanup();
-    }
+    // For workspace sources, upload the working tree directly (no git archive).
+    // This ensures uncommitted changes and feature branches are included.
+    const localPath = resolve(source.localPath);
+    await client.uploadDirectory(vmId, localPath, source.remotePath);
   }
 }
 
