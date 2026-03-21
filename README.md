@@ -14,10 +14,10 @@ Standard user onboarding from public commits:
 
 ```bash
 # With VERS_API_KEY in your environment (e.g. .zshrc)
-node src/cli.js provision --root-commit <root-id> --golden-commit <golden-id>
+bun src/cli.js provision --root-commit <root-id> --golden-commit <golden-id>
 
 # Or with shell-auth
-node src/cli.js provision --root-commit <root-id> --golden-commit <golden-id> --email you@example.com
+bun src/cli.js provision --root-commit <root-id> --golden-commit <golden-id> --email you@example.com
 ```
 
 ## Auth
@@ -36,7 +36,7 @@ Users returning to an existing reef or managing commits should use their saved `
 Spawn a root reef VM from pre-built commits and configure it with your keys.
 
 ```bash
-node src/cli.js provision --root-commit <id> --golden-commit <id> [--email you@example.com]
+bun src/cli.js provision --root-commit <id> --golden-commit <id> [--email you@example.com]
 ```
 
 Required flags:
@@ -60,10 +60,10 @@ Build a root reef image and commit it. No secrets are baked in — the image con
 
 ```bash
 # Private build — keep VM alive for testing
-node src/cli.js build-root --private [--email you@example.com]
+bun src/cli.js build-root --private [--email you@example.com]
 
 # Public build — publish immediately, delete builder VM
-node src/cli.js build-root --public [--email you@example.com]
+bun src/cli.js build-root --public [--email you@example.com]
 ```
 
 Required flags:
@@ -84,10 +84,10 @@ Build a golden agent image for child VMs (lieutenants, swarm workers, all agent 
 
 ```bash
 # Private build
-node src/cli.js build-golden --private --reef-path ./reef --pi-vers-path ./pi-vers
+bun src/cli.js build-golden --private --reef-path ./reef --pi-vers-path ./pi-vers
 
 # Public build
-node src/cli.js build-golden --public --reef-path ./reef --pi-vers-path ./pi-vers
+bun src/cli.js build-golden --public --reef-path ./reef --pi-vers-path ./pi-vers
 ```
 
 Required flags:

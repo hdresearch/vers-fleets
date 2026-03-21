@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 
 import { resolve } from "node:path";
 import { buildGolden, buildRoot, provisionFleet } from "./orchestrate.js";
@@ -78,11 +78,11 @@ function printHelp() {
   console.log(`vers-fleets
 
 Usage:
-  node src/cli.js provision    --root-commit <id> --golden-commit <id> [--email you@example.com]
+  bun src/cli.js provision    --root-commit <id> --golden-commit <id> [--email you@example.com]
                                [--force-shell-auth] [--root-name root-reef] [--out-dir out]
-  node src/cli.js build-root   --public | --private [--email you@example.com]
+  bun src/cli.js build-root   --public | --private [--email you@example.com]
                                [--force-shell-auth] [--root-name root-reef] [--out-dir out]
-  node src/cli.js build-golden --public | --private --reef-path <path> --pi-vers-path <path>
+  bun src/cli.js build-golden --public | --private --reef-path <path> --pi-vers-path <path>
                                [--email you@example.com] [--force-shell-auth] [--out-dir out]
 
 Commands:
@@ -142,7 +142,7 @@ async function main() {
     }
     console.log(`\nSave this VERS_API_KEY — you need it to manage this commit.`);
     console.log(`\nTo provision from this image:`);
-    console.log(`  node src/cli.js provision --root-commit ${result.commitId} --golden-commit <golden-id>`);
+    console.log(`  bun src/cli.js provision --root-commit ${result.commitId} --golden-commit <golden-id>`);
     return;
   }
 
@@ -188,7 +188,7 @@ async function main() {
     }
     console.log(`\nSave this VERS_API_KEY — you need it to manage this commit.`);
     console.log(`\nTo provision with this golden image:`);
-    console.log(`  node src/cli.js provision --root-commit <root-id> --golden-commit ${result.commitId}`);
+    console.log(`  bun src/cli.js provision --root-commit <root-id> --golden-commit ${result.commitId}`);
     return;
   }
 

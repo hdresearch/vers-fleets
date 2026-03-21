@@ -302,11 +302,10 @@ export async function buildGolden(input = {}, options = {}) {
     : await ensurePiVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true });
   const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey }));
 
-  // Import the golden bootstrap script builder from reef
+  // Import the golden bootstrap script builder from reef (TypeScript, runs under Bun)
   const { buildGoldenBootstrapScript } = await import(
-    resolve(options.reefPath || "../reef", "services/commits/golden.js")
+    resolve(options.reefPath || "../reef", "services/commits/golden.ts")
   ).catch(() => {
-    // Fallback: use the pi-vers golden module if reef isn't available locally
     throw new Error(
       "Could not load reef golden bootstrap. Set --reef-path to the local reef directory.",
     );
