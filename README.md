@@ -8,6 +8,12 @@ Three commands:
 - **`build-root`** — Build a root reef image and commit it (no secrets baked in)
 - **`build-golden`** — Build a golden agent image and commit it (no secrets baked in)
 
+## Prerequisites
+
+1. **Vers account** — use `--email you@example.com` with any command to shell-auth via magic link. This creates a new Vers account with starter credits if you don't have one, or logs you into your existing account. If you already have a `VERS_API_KEY` from [vers.sh](https://vers.sh), set it in your environment and skip the `--email` flag.
+2. **Bun** — install via `curl -fsSL https://bun.sh/install | bash`
+3. **Clone this repo** — `git clone https://github.com/hdresearch/vers-fleets.git && cd vers-fleets && bun install`
+
 ## Quickstart
 
 Provision a reef fleet from public pre-built images:
@@ -35,6 +41,27 @@ bun src/cli.js provision \
 | Golden agent | `d2fedfa3-a835-4745-9b50-0e94d347d26b` | Agent VM runtime — punkin + pi-vers + reef extensions |
 
 These images contain no secrets and are safe for anyone with a Vers account to use.
+
+### After provisioning
+
+Provisioning prints the root reef URL and writes `out/deployment.json` with your auth credentials. To access the UI:
+
+1. **Get a magic link** — the reef UI requires authentication via a one-time magic link:
+   ```bash
+   # Read the auth token from the deployment manifest
+   AUTH=$(python3 -c "import json; d=json.load(open('out/deployment.json')); print(d['auth']['versAuthToken'])")
+
+   # Generate a magic link (expires in 5 minutes)
+   curl -s -X POST "https://<your-vm-id>.vm.vers.sh:3000/auth/magic-link" \
+     -H "Authorization: Bearer $AUTH" -H "Content-Type: application/json"
+   ```
+2. **Open the link** in your browser — it sets a session cookie (30 days) and redirects to the reef dashboard
+3. **Start chatting** — type in the chat input or drag-and-drop files. The agent has tools to manage VMs, spawn swarms, deploy services, and more.
+4. **Save your `VERS_API_KEY`** — printed during provisioning. You'll need it to SSH into VMs and manage commits.
+
+### Credits
+
+The reef agent uses Claude via the Vers LLM proxy. Make sure your Vers account has credits — the agent won't respond without them. Lieutenants and swarm workers also consume credits when they run.
 
 ## Auth
 
