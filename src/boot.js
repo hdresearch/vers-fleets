@@ -197,6 +197,9 @@ if [ -x /usr/local/bin/punkin ]; then
 fi
 
 mkdir -p /root/.punkin/agent /root/.pi/agent
+if [ -f /opt/reef/AGENTS.md ]; then
+  ln -sfn /opt/reef/AGENTS.md /root/.pi/agent/AGENTS.md
+fi
 if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
   "${options.punkinBin || "punkin"}" install /opt/pi-vers
   "${options.punkinBin || "punkin"}" install /opt/reef
@@ -264,6 +267,12 @@ for dir in /root/reef/services/*/; do
 done
 
 mkdir -p /root/workspace /root/.punkin/agent /root/.pi/agent /etc/profile.d
+
+# Make AGENTS.md discoverable by punkin on child VMs
+if [ -f /root/reef/AGENTS.md ]; then
+  ln -sfn /root/reef/AGENTS.md /root/.pi/agent/AGENTS.md
+  ln -sfn /root/reef/AGENTS.md /root/workspace/AGENTS.md
+fi
 
 # Punkin wrapper — uses absolute bun path, sources reef-agent.sh for child env
 BUN_PATH=$(command -v bun 2>/dev/null || echo "/root/.bun/bin/bun")
