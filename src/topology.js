@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 export const DEFAULT_ROOT_CATEGORY = "infra_vm";
+export const DEFAULT_PUNKIN_RELEASE_TAG = "carter/punkin/v1_rc5";
 
 function defaultRootVmConfig() {
   return {
@@ -12,7 +13,7 @@ function defaultRootVmConfig() {
 
 export function defaultSharedOperationalDna() {
   return {
-    services: ["bootloader", "cron", "docs", "installer", "lieutenant", "services", "ui", "vers-config"],
+    services: ["bootloader", "cron", "docs", "installer", "lieutenant", "services", "swarm", "ui", "vers-config"],
     capabilities: ["pi-vers", "punkin", "reef-extension", "vers-fleets"],
   };
 }
@@ -127,10 +128,6 @@ export function validateSpec(input = {}) {
   const rootName = typeof input.rootName === "string" && input.rootName.trim() ? input.rootName.trim() : "root-reef";
   const rootVmId = typeof input.rootVmId === "string" && input.rootVmId.trim() ? input.rootVmId.trim() : null;
 
-  const anthroKeyEnv =
-    typeof input.anthropicApiKeyEnv === "string" && input.anthropicApiKeyEnv.trim()
-      ? input.anthropicApiKeyEnv.trim()
-      : "ANTHROPIC_API_KEY";
   const versKeyEnv =
     typeof input.versApiKeyEnv === "string" && input.versApiKeyEnv.trim() ? input.versApiKeyEnv.trim() : "VERS_API_KEY";
   const authTokenEnv =
@@ -159,7 +156,7 @@ export function validateSpec(input = {}) {
       type: "git",
       repoPath: null,
       repoUrl: "https://github.com/hdresearch/punkin-pi.git",
-      ref: "v1rc3",
+      ref: DEFAULT_PUNKIN_RELEASE_TAG,
     }),
   };
 
@@ -183,7 +180,6 @@ export function validateSpec(input = {}) {
     rootVmId,
     sources,
     rootVmConfig,
-    anthroKeyEnv,
     versKeyEnv,
     authTokenEnv,
     infraUrlEnv,
@@ -228,7 +224,6 @@ export function buildTopology(input = {}) {
     },
     sources: spec.sources,
     env: {
-      anthropicApiKeyEnv: spec.anthroKeyEnv,
       versApiKeyEnv: spec.versKeyEnv,
       versAuthTokenEnv: spec.authTokenEnv,
       versInfraUrlEnv: spec.infraUrlEnv,
