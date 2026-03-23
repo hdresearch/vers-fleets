@@ -14,8 +14,8 @@ Provision a reef fleet from public pre-built images:
 
 ```bash
 bun src/cli.js provision \
-  --root-commit 93df0e8b-09a2-4c46-8a0a-14ae56e06eaf \
-  --golden-commit 72c22b14-e494-4dfc-958f-bcb5612958f6 \
+  --root-commit 5d9c6176-2e9e-4b38-8fc2-f7e0fb3507ce \
+  --golden-commit d2fedfa3-a835-4745-9b50-0e94d347d26b \
   --email you@example.com
 ```
 
@@ -23,16 +23,16 @@ Or with `VERS_API_KEY` already set in your environment:
 
 ```bash
 bun src/cli.js provision \
-  --root-commit 93df0e8b-09a2-4c46-8a0a-14ae56e06eaf \
-  --golden-commit 72c22b14-e494-4dfc-958f-bcb5612958f6
+  --root-commit 5d9c6176-2e9e-4b38-8fc2-f7e0fb3507ce \
+  --golden-commit d2fedfa3-a835-4745-9b50-0e94d347d26b
 ```
 
 ### Public images
 
 | Image | Commit ID | Description |
 |-------|-----------|-------------|
-| Root reef | `93df0e8b-09a2-4c46-8a0a-14ae56e06eaf` | Root orchestrator — reef server with all services |
-| Golden agent | `72c22b14-e494-4dfc-958f-bcb5612958f6` | Agent VM runtime — punkin + pi-vers + reef extensions |
+| Root reef | `5d9c6176-2e9e-4b38-8fc2-f7e0fb3507ce` | Root orchestrator — reef server with all services |
+| Golden agent | `d2fedfa3-a835-4745-9b50-0e94d347d26b` | Agent VM runtime — punkin + pi-vers + reef extensions |
 
 These images contain no secrets and are safe for anyone with a Vers account to use.
 
