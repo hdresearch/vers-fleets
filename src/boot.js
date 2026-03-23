@@ -179,15 +179,16 @@ done
 
 # Create a wrapper script for punkin that uses bun and resolves paths correctly.
 # Direct symlinks break because bun resolves relative imports from the symlink location.
+BUN_PATH=$(command -v bun 2>/dev/null || echo "/root/.bun/bin/bun")
 if [ -x /opt/punkin-pi/builds/punkin ]; then
-  cat > /usr/local/bin/punkin <<'WRAPPER'
-#!/usr/bin/env bun
-import { main } from "/opt/punkin-pi/builds/punkin";
+  cat > /usr/local/bin/punkin <<WRAPPER
+#!/bin/sh
+exec $BUN_PATH /opt/punkin-pi/builds/punkin "\\\$@"
 WRAPPER
 elif [ -x /opt/punkin-pi/packages/coding-agent/dist/cli.js ]; then
-  cat > /usr/local/bin/punkin <<'WRAPPER'
+  cat > /usr/local/bin/punkin <<WRAPPER
 #!/bin/sh
-exec bun /opt/punkin-pi/packages/coding-agent/dist/cli.js "$@"
+exec $BUN_PATH /opt/punkin-pi/packages/coding-agent/dist/cli.js "\\\$@"
 WRAPPER
 fi
 chmod +x /usr/local/bin/punkin 2>/dev/null || true
