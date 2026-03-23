@@ -207,6 +207,136 @@ echo "[vers-fleets] root reef image build complete"
 }
 
 /**
+ * Build the golden agent image — install system deps, clone/upload repos,
+ * build all packages, install punkin CLI, set up child agent profile.
+ * No secrets, no runtime config. The result can be committed as a public image.
+ */
+export function buildGoldenImageScript(topology, options = {}) {
+  const punkinRef = topology.sources.punkin.ref || DEFAULT_PUNKIN_RELEASE_TAG;
+  return `#!/bin/bash
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+export PATH="/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
+echo "[vers-fleets] building golden agent image"
+
+apt-get update -qq
+apt-get install -y -qq curl git ca-certificates build-essential openssl unzip
+
+if ! command -v node >/dev/null 2>&1 || [ "$(node -p 'Number(process.versions.node.split(".")[0])' 2>/dev/null || echo 0)" -lt 20 ]; then
+  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+  apt-get install -y -qq nodejs
+fi
+
+if ! command -v bun >/dev/null 2>&1; then
+  curl -fsSL https://bun.sh/install | bash
+  export PATH="/root/.bun/bin:$PATH"
+fi
+
+${buildSourceScript("reef", topology.sources.reef, "/root/reef")}
+${buildSourceScript("pi-vers", topology.sources.piVers, "/root/pi-vers")}
+${buildSourceScript("punkin-pi", topology.sources.punkin, "/root/punkin-pi", { preferExactTag: true })}
+
+cd /root/punkin-pi
+HUSKY=0 npm install
+npm run build
+
+cd /root/pi-vers
+npm install
+npm run build
+
+cd /root/reef
+bun install
+
+for pkg_root in /root/pi-vers /root/reef; do
+  mkdir -p "$pkg_root/node_modules/@mariozechner"
+  ln -sfn /root/punkin-pi/packages/tui "$pkg_root/node_modules/@mariozechner/pi-tui"
+  ln -sfn /root/punkin-pi/packages/coding-agent "$pkg_root/node_modules/@mariozechner/pi-coding-agent"
+  ln -sfn /root/punkin-pi/packages/ai "$pkg_root/node_modules/@mariozechner/pi-ai"
+  ln -sfn /root/punkin-pi/packages/agent "$pkg_root/node_modules/@mariozechner/pi-agent-core"
+done
+
+rm -rf /root/reef/services-active
+mkdir -p /root/reef/services-active
+for dir in /root/reef/services/*/; do
+  svc=$(basename "$dir")
+  ln -s "../services/$svc" "/root/reef/services-active/$svc"
+done
+
+mkdir -p /root/workspace /root/.punkin/agent /root/.pi/agent /etc/profile.d
+
+# Punkin wrapper — uses absolute bun path, sources reef-agent.sh for child env
+BUN_PATH=$(command -v bun 2>/dev/null || echo "/root/.bun/bin/bun")
+if [ -x /root/punkin-pi/builds/punkin ]; then
+  cat > /usr/local/bin/punkin <<WRAPPER
+#!/bin/sh
+if [ -f /etc/profile.d/reef-agent.sh ]; then
+  set -a
+  . /etc/profile.d/reef-agent.sh
+  set +a
+fi
+exec $BUN_PATH /root/punkin-pi/builds/punkin "\\\$@"
+WRAPPER
+elif [ -x /root/punkin-pi/packages/coding-agent/dist/cli.js ]; then
+  chmod +x /root/punkin-pi/packages/coding-agent/dist/cli.js
+  cat > /usr/local/bin/punkin <<WRAPPER
+#!/bin/sh
+if [ -f /etc/profile.d/reef-agent.sh ]; then
+  set -a
+  . /etc/profile.d/reef-agent.sh
+  set +a
+fi
+exec $BUN_PATH /root/punkin-pi/packages/coding-agent/dist/cli.js "\\\$@"
+WRAPPER
+fi
+chmod +x /usr/local/bin/punkin 2>/dev/null || true
+ln -sf /usr/local/bin/punkin /usr/local/bin/pi
+
+# Patch punkin shebang to use bun instead of node.
+# Reef services use bun:sqlite which requires the bun runtime.
+for f in /root/punkin-pi/packages/coding-agent/dist/cli.js /root/punkin-pi/builds/punkin; do
+  if [ -f "$f" ] && head -1 "$f" | grep -q "#!/usr/bin/env node"; then
+    sed -i '1s|#!/usr/bin/env node|#!/usr/bin/env bun|' "$f"
+  fi
+done
+
+cat > /etc/profile.d/reef-agent.sh <<ENVEOF
+export PATH="/root/.bun/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:\\$PATH"
+# VERS_INFRA_URL, LLM_PROXY_KEY, and VERS_API_KEY are injected post-spawn, not baked into the image
+export PUNKIN_RELEASE_TAG=${shellQuote(punkinRef)}
+export PUNKIN_BIN=punkin
+export PI_PATH=punkin
+export PI_VERS_HOME=/root/pi-vers
+export SERVICES_DIR=/root/reef/services-active
+export REEF_CHILD_AGENT=true
+ENVEOF
+chmod 0644 /etc/profile.d/reef-agent.sh
+
+for shell_rc in /root/.profile /root/.bashrc /root/.zshenv; do
+  touch "$shell_rc"
+  if ! grep -q "reef-agent.sh" "$shell_rc"; then
+    printf '\\n[ -f /etc/profile.d/reef-agent.sh ] && . /etc/profile.d/reef-agent.sh\\n' >> "$shell_rc"
+  fi
+done
+
+set -a
+source /etc/profile.d/reef-agent.sh
+set +a
+
+if command -v "$PI_PATH" >/dev/null 2>&1; then
+  "$PI_PATH" install /root/pi-vers
+  "$PI_PATH" install /root/reef
+fi
+
+test -x /usr/local/bin/pi
+test -d /root/pi-vers
+test -d /root/reef/services-active
+
+echo "[vers-fleets] golden agent image build complete"
+`;
+}
+
+/**
  * Phase 2: Inject secrets and start reef. Runs on a VM that already has
  * the image built (either from buildImageScript or restored from a commit).
  */

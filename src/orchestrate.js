@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolve } from "node:path";
-import { buildBootstrapBundle, buildImageScript, buildRuntimeScript, buildRuntimeEnv } from "./boot.js";
+import { buildBootstrapBundle, buildImageScript, buildGoldenImageScript, buildRuntimeScript, buildRuntimeEnv } from "./boot.js";
 import { createPiVersClient, ensurePiVersApiKey } from "./pi-vers.js";
 import { buildTopology, validateSpec } from "./topology.js";
 
@@ -92,13 +92,13 @@ async function waitForHealth(baseUrl, fetchImpl = fetch, maxAttempts = 60, delay
   throw new Error(`Timed out waiting for reef health at ${baseUrl}/health`);
 }
 
-function stageableSources(topology) {
+function stageableSources(topology, remoteBase = "/opt/src") {
   return Object.entries(topology.sources)
     .filter(([, source]) => source.type === "workspace")
     .map(([name, source]) => ({
       name,
       localPath: resolve(source.repoPath),
-      remotePath: `/opt/src/${name === "piVers" ? "pi-vers" : name === "punkin" ? "punkin-pi" : name}`,
+      remotePath: `${remoteBase}/${name === "piVers" ? "pi-vers" : name === "punkin" ? "punkin-pi" : name}`,
     }));
 }
 
@@ -172,8 +172,13 @@ async function materializeWorkspaceSource(source) {
 
 async function defaultStageSources(client, vmId, topology) {
   for (const source of stageableSources(topology)) {
-    // For workspace sources, upload the working tree directly (no git archive).
-    // This ensures uncommitted changes and feature branches are included.
+    const localPath = resolve(source.localPath);
+    await client.uploadDirectory(vmId, localPath, source.remotePath);
+  }
+}
+
+async function goldenStageSources(client, vmId, topology) {
+  for (const source of stageableSources(topology, "/root")) {
     const localPath = resolve(source.localPath);
     await client.uploadDirectory(vmId, localPath, source.remotePath);
   }
@@ -228,12 +233,20 @@ export async function buildRoot(input = {}, options = {}) {
   const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey }));
 
   // Support local workspace sources via --reef-path / --pi-vers-path
+  // and specific branches/tags via --reef-ref / --pi-vers-ref / --punkin-ref
   const sources = {};
   if (options.reefPath) {
     sources.reef = { type: "workspace", repoPath: resolve(options.reefPath) };
+  } else if (options.reefRef) {
+    sources.reef = { type: "git", repoUrl: "https://github.com/hdresearch/reef.git", ref: options.reefRef };
   }
   if (options.piVersPath) {
     sources.piVers = { type: "workspace", repoPath: resolve(options.piVersPath) };
+  } else if (options.piVersRef) {
+    sources.piVers = { type: "git", repoUrl: "https://github.com/hdresearch/pi-vers.git", ref: options.piVersRef };
+  }
+  if (options.punkinRef) {
+    sources.punkin = { type: "git", repoUrl: "https://github.com/hdresearch/punkin-pi.git", ref: options.punkinRef };
   }
   const topoInput = { ...input, ...(Object.keys(sources).length > 0 ? { sources } : {}) };
 
@@ -307,14 +320,24 @@ export async function buildGolden(input = {}, options = {}) {
     : await ensurePiVersApiKey({ email: options.email, forceShellAuth: options.forceShellAuth === true });
   const client = options.client || (await createPiVersClient({ apiKey: auth.apiKey }));
 
-  // Import the golden bootstrap script builder from reef (TypeScript, runs under Bun)
-  const { buildGoldenBootstrapScript } = await import(
-    resolve(options.reefPath || "../reef", "services/commits/golden.ts")
-  ).catch(() => {
-    throw new Error(
-      "Could not load reef golden bootstrap. Set --reef-path to the local reef directory.",
-    );
-  });
+  // Build topology sources — same system as build-root
+  const sources = {};
+  if (options.reefPath) {
+    sources.reef = { type: "workspace", repoPath: resolve(options.reefPath) };
+  } else if (options.reefRef) {
+    sources.reef = { type: "git", repoUrl: "https://github.com/hdresearch/reef.git", ref: options.reefRef };
+  }
+  if (options.piVersPath) {
+    sources.piVers = { type: "workspace", repoPath: resolve(options.piVersPath) };
+  } else if (options.piVersRef) {
+    sources.piVers = { type: "git", repoUrl: "https://github.com/hdresearch/pi-vers.git", ref: options.piVersRef };
+  }
+  if (options.punkinRef) {
+    sources.punkin = { type: "git", repoUrl: "https://github.com/hdresearch/punkin-pi.git", ref: options.punkinRef };
+  }
+  const topoInput = { ...input, ...(Object.keys(sources).length > 0 ? { sources } : {}) };
+  const topology = buildTopology(topoInput);
+  const goldenScript = buildGoldenImageScript(topology, {});
 
   const DEFAULT_GOLDEN_VM_CONFIG = {
     vcpu_count: 2,
@@ -323,20 +346,18 @@ export async function buildGolden(input = {}, options = {}) {
   };
 
   const vmConfig = input.vmConfig || DEFAULT_GOLDEN_VM_CONFIG;
-  const reefDir = resolve(options.reefPath || "../reef");
-  const piVersDir = resolve(options.piVersPath || "../pi-vers");
 
   console.log("[vers-fleets] Creating VM for golden image build...");
   const builder = await client.createRoot(vmConfig, true);
   const vmId = builder.vm_id;
 
   try {
-    console.log("[vers-fleets] Uploading reef and pi-vers sources...");
-    await client.uploadDirectory(vmId, reefDir, "/root/reef");
-    await client.uploadDirectory(vmId, piVersDir, "/root/pi-vers");
+    // Stage workspace sources (upload local dirs to VM — golden uses /root/ paths)
+    const stageSources = options.stageSources || goldenStageSources;
+    await stageSources(client, vmId, topology);
 
     console.log("[vers-fleets] Running golden image build script (this may take a few minutes)...");
-    await client.execScript(vmId, buildGoldenBootstrapScript());
+    await client.execScript(vmId, goldenScript);
 
     console.log("[vers-fleets] Committing golden image...");
     const committed = await client.commit(vmId, true);
