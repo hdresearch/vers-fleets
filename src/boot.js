@@ -205,6 +205,14 @@ if command -v "${options.punkinBin || "punkin"}" >/dev/null 2>&1; then
   "${options.punkinBin || "punkin"}" install /opt/reef
 fi
 
+# Install git-credential-vers — credential helper that mints GitHub tokens via Vers.
+# No secrets baked in — reads the Vers API key from env at runtime.
+if [ -f /opt/reef/services/github/credential-helper.sh ]; then
+  cp /opt/reef/services/github/credential-helper.sh /usr/local/bin/git-credential-vers
+  chmod +x /usr/local/bin/git-credential-vers
+  git config --global credential.https://github.com.helper /usr/local/bin/git-credential-vers
+fi
+
 echo "[vers-fleets] root reef image build complete"
 `;
 }
@@ -335,6 +343,14 @@ set +a
 if command -v "$PI_PATH" >/dev/null 2>&1; then
   "$PI_PATH" install /root/pi-vers
   "$PI_PATH" install /root/reef
+fi
+
+# Install git-credential-vers — credential helper that mints GitHub tokens via Vers.
+# No secrets baked in — reads the Vers API key from env at runtime.
+if [ -f /root/reef/services/github/credential-helper.sh ]; then
+  cp /root/reef/services/github/credential-helper.sh /usr/local/bin/git-credential-vers
+  chmod +x /usr/local/bin/git-credential-vers
+  git config --global credential.https://github.com.helper /usr/local/bin/git-credential-vers
 fi
 
 test -x /usr/local/bin/pi
