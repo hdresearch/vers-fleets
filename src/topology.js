@@ -13,8 +13,8 @@ function defaultRootVmConfig() {
 
 export function defaultSharedOperationalDna() {
   return {
-    services: ["bootloader", "cron", "docs", "installer", "lieutenant", "services", "swarm", "ui", "vers-config"],
-    capabilities: ["pi-vers", "punkin", "reef-extension", "vers-fleets"],
+    services: ["bootloader", "cron", "docs", "github", "installer", "lieutenant", "services", "swarm", "ui", "vers-config"],
+    capabilities: ["github", "pi-vers", "punkin", "reef-extension", "vers-fleets"],
   };
 }
 
