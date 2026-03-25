@@ -205,8 +205,8 @@ Commits are managed via the Vers orchestrator API at `https://api.vers.sh/api/v1
 ## Development
 
 ```bash
-npm install
-npm test
+bun install
+bun test
 ```
 
 ## Optional flags
