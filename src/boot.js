@@ -159,12 +159,12 @@ ln -sfn /opt/src/pi-vers /opt/pi-vers
 ln -sfn /opt/src/punkin-pi /opt/punkin-pi
 
 cd /opt/punkin-pi
-HUSKY=0 npm install
-npm run build
+HUSKY=0 bun install
+bun run build
 
 cd /opt/pi-vers
-npm install
-npm run build
+bun install
+bun run build
 
 cd /opt/reef
 bun install
@@ -249,12 +249,12 @@ ${buildSourceScript("pi-vers", topology.sources.piVers, "/root/pi-vers")}
 ${buildSourceScript("punkin-pi", topology.sources.punkin, "/root/punkin-pi", { preferExactTag: true })}
 
 cd /root/punkin-pi
-HUSKY=0 npm install
-npm run build
+HUSKY=0 bun install
+bun run build
 
 cd /root/pi-vers
-npm install
-npm run build
+bun install
+bun run build
 
 cd /root/reef
 bun install

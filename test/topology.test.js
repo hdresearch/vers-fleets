@@ -43,7 +43,7 @@ test("buildBootstrapBundle emits git-based root bootstrap script", () => {
   assert.match(bundle.scripts.root, /git rev-parse --verify -q 'refs\/tags\/carter\/punkin\/v1_rc5' >/);
   assert.match(bundle.scripts.root, /git -c advice\.detachedHead=false checkout --detach 'refs\/tags\/carter\/punkin\/v1_rc5'/);
   assert.match(bundle.scripts.root, /setup_22\.x/);
-  assert.match(bundle.scripts.root, /HUSKY=0 npm install/);
+  assert.match(bundle.scripts.root, /HUSKY=0 bun install/);
   assert.match(bundle.scripts.root, /PI_PATH='punkin'/);
   assert.match(bundle.scripts.root, /ln -sf \/usr\/local\/bin\/punkin \/usr\/local\/bin\/pi/);
   assert.match(bundle.scripts.root, /ln -sfn \/opt\/punkin-pi\/packages\/coding-agent "\$pkg_root\/node_modules\/@mariozechner\/pi-coding-agent"/);
@@ -78,7 +78,7 @@ test("buildImageScript produces a secret-free image build script", () => {
   const script = buildImageScript(topology);
   assert.match(script, /building root reef image/);
   assert.match(script, /git clone/);
-  assert.match(script, /HUSKY=0 npm install/);
+  assert.match(script, /HUSKY=0 bun install/);
   assert.match(script, /bun install/);
   assert.match(script, /image build complete/);
   // No secrets in the image script
