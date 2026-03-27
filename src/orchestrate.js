@@ -191,13 +191,24 @@ async function registerRootFleetRecords(topology, authToken, fetchImpl = fetch) 
   await apiRequest(rootBaseUrl, authToken, "PATCH", `/vm-tree/vms/${encodeURIComponent(topology.root.vmId)}`, {
     name: topology.root.name,
     category: topology.root.category,
+    status: "running",
+    address: `${topology.root.vmId}.vm.vers.sh`,
+    lastHeartbeat: Date.now(),
     reefConfig: topology.root.reefConfig,
   }, fetchImpl).catch(async () => {
     await apiRequest(rootBaseUrl, authToken, "POST", "/vm-tree/vms", {
       vmId: topology.root.vmId,
       name: topology.root.name,
       category: topology.root.category,
+      status: "running",
+      address: `${topology.root.vmId}.vm.vers.sh`,
+      lastHeartbeat: Date.now(),
       reefConfig: topology.root.reefConfig,
+    }, fetchImpl);
+    await apiRequest(rootBaseUrl, authToken, "PATCH", `/vm-tree/vms/${encodeURIComponent(topology.root.vmId)}`, {
+      status: "running",
+      address: `${topology.root.vmId}.vm.vers.sh`,
+      lastHeartbeat: Date.now(),
     }, fetchImpl);
   });
 
@@ -457,6 +468,7 @@ export async function provisionFleet(input = {}, options = {}) {
       versApiKey: auth.apiKey,
       versAuthToken: authToken,
       llmProxyKey: llmProxy.key,
+      anthropicApiKey: options.anthropicApiKey || process.env.ANTHROPIC_API_KEY,
       rootCommitId,
       goldenCommitId,
     });
@@ -474,6 +486,7 @@ export async function provisionFleet(input = {}, options = {}) {
         versApiKey: auth.apiKey,
         versAuthToken: authToken,
         llmProxyKey: llmProxy.key,
+        anthropicApiKey: options.anthropicApiKey || process.env.ANTHROPIC_API_KEY,
         goldenCommitId,
       },
     );
