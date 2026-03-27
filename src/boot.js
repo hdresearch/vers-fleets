@@ -66,10 +66,6 @@ export function buildRuntimeEnv(vm, topology, options = {}) {
   if (options.goldenCommitId && String(options.goldenCommitId).trim()) {
     env.VERS_GOLDEN_COMMIT_ID = shellQuote(options.goldenCommitId);
   }
-  // Forward GITHUB_TOKEN if set in the build environment
-  if (process.env.GITHUB_TOKEN) {
-    env.GITHUB_TOKEN = shellQuote(process.env.GITHUB_TOKEN);
-  }
 
   return env;
 }
@@ -330,7 +326,6 @@ export PI_PATH=punkin
 export PI_VERS_HOME=/root/pi-vers
 export SERVICES_DIR=/root/reef/services-active
 export REEF_CHILD_AGENT=true
-${process.env.GITHUB_TOKEN ? `export GITHUB_TOKEN=${shellQuote(process.env.GITHUB_TOKEN)}` : "# GITHUB_TOKEN not set at build time"}
 ENVEOF
 chmod 0644 /etc/profile.d/reef-agent.sh
 
