@@ -13,14 +13,14 @@ function defaultRootVmConfig() {
 
 export function defaultSharedOperationalDna() {
   return {
-    services: ["bootloader", "cron", "docs", "github", "installer", "lieutenant", "logs", "services", "signals", "swarm", "ui", "vers-config"],
+    services: ["bootloader", "cron", "docs", "github", "installer", "lieutenant", "logs", "probe", "services", "signals", "swarm", "ui", "vers-config"],
     capabilities: ["github", "pi-vers", "punkin", "reef-extension", "vers-fleets"],
   };
 }
 
 export function defaultRootAuthorityOverlayDna() {
   return {
-    services: ["commits", "registry", "store", "vm-tree"],
+    services: ["commits", "store", "usage", "vm-tree"],
     capabilities: ["reef-root", "root-lineage", "sqlite-authority"],
   };
 }
