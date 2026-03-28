@@ -25,6 +25,7 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.root.runtime.profile, "root-with-authority-overlay");
   assert.equal(topology.root.reefConfig.services.includes("vm-tree"), true);
   assert.equal(topology.root.reefConfig.services.includes("store"), true);
+  assert.equal(topology.root.reefConfig.services.includes("scheduled"), true);
   assert.equal(topology.root.reefConfig.services.includes("usage"), true);
   assert.equal(topology.root.reefConfig.services.includes("probe"), true);
   assert.equal(topology.root.reefConfig.services.includes("commits"), true);

@@ -20,7 +20,7 @@ export function defaultSharedOperationalDna() {
 
 export function defaultRootAuthorityOverlayDna() {
   return {
-    services: ["commits", "store", "usage", "vm-tree"],
+    services: ["commits", "scheduled", "store", "usage", "vm-tree"],
     capabilities: ["reef-root", "root-lineage", "sqlite-authority"],
   };
 }
