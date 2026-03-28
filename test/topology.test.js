@@ -75,7 +75,7 @@ test("buildBootstrapBundle can inline runtime secrets for remote bootstrap", () 
   assert.match(bundle.scripts.root, /LLM_PROXY_KEY='sk-vers-secret'/);
 });
 
-test("buildBootstrapBundle prefers a real Anthropic key when provided", () => {
+test("buildBootstrapBundle prefers a dedicated secondary provider key when provided", () => {
   const bundle = buildBootstrapBundle(
     {
       rootName: "reef-root",
@@ -136,7 +136,7 @@ test("buildRuntimeScript injects secrets and starts reef", () => {
   }
 });
 
-test("buildRuntimeScript prefers a dedicated Anthropic fallback key", () => {
+test("buildRuntimeScript prefers a dedicated secondary provider key", () => {
   const topology = buildTopology({ rootName: "reef-root", rootVmId: "vm-1" });
   const script = buildRuntimeScript(topology.root, topology, {
     versApiKey: "vers-key",

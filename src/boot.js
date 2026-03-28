@@ -44,8 +44,7 @@ export function buildRuntimeEnv(vm, topology, options = {}) {
         : `\${${topology.env.versAuthTokenEnv}:-}`,
     VERS_INFRA_URL: shellQuote(rootUrl),
     LLM_PROXY_KEY: llmProxyKey,
-    // Prefer a real Anthropic key when present so runtime fallback can switch
-    // providers after the Vers proxy returns a credit-exhausted 429.
+    // Optional secondary provider key for internal runtime failover.
     ANTHROPIC_API_KEY: anthropicApiKey,
     REEF_MODEL_PROVIDER:
       options.modelProvider && String(options.modelProvider).trim()
