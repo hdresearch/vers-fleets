@@ -1,7 +1,31 @@
 #!/usr/bin/env bun
 
 import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import { buildGolden, buildRoot, provisionFleet } from "./orchestrate.js";
+
+function checkPrerequisites() {
+  const missing = [];
+  for (const bin of ["ssh", "openssl"]) {
+    try {
+      execFileSync(bin, ["--help"], { stdio: "ignore" });
+    } catch (e) {
+      if (e.code === "ENOENT") missing.push(bin);
+    }
+  }
+  if (missing.length > 0) {
+    console.error(`Error: missing required tools: ${missing.join(", ")}`);
+    if (process.platform === "win32") {
+      console.error(`
+On Windows, install these via one of:
+  - Git for Windows (includes both ssh and openssl): https://git-scm.com/download/win
+  - OpenSSH Client: Settings > Apps > Optional Features > OpenSSH Client
+  - winget: winget install Git.Git
+After installing, restart your terminal so PATH is updated.`);
+    }
+    process.exit(1);
+  }
+}
 
 function parseArgs(argv) {
   const args = {
@@ -141,6 +165,7 @@ async function main() {
   }
 
   if (args.command === "build-root") {
+    checkPrerequisites();
     requireAuth(args);
     if (!args.visibility) {
       console.error("Error: --public or --private is required for build-root.");
@@ -182,6 +207,7 @@ async function main() {
   }
 
   if (args.command === "build-golden") {
+    checkPrerequisites();
     requireAuth(args);
     if (!args.visibility) {
       console.error("Error: --public or --private is required for build-golden.");
@@ -223,7 +249,11 @@ async function main() {
   }
 
   if (args.command === "provision") {
+    checkPrerequisites();
     requireAuth(args);
+    if (args.email && (!process.env.VERS_API_KEY || args.forceShellAuth)) {
+      console.log(`[vers-fleets] A magic link will be sent to ${args.email} — check your inbox (and spam) and click it to authenticate.`);
+    }
     if (!args.rootCommitId) {
       console.error("Error: --root-commit is required for provision.");
       process.exit(1);

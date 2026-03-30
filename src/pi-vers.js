@@ -40,11 +40,12 @@ async function ensurePiVersBuilt() {
   const distIndex = piVersDistIndexPath();
   if (existsSync(distIndex)) return;
   if (!buildPromise) {
-    buildPromise = execFileAsync("npm", ["run", "build"], {
-      cwd: piVersRepoPath(),
-    }).finally(() => {
-      buildPromise = null;
-    });
+    const repoPath = piVersRepoPath();
+    buildPromise = execFileAsync("bun", ["install"], { cwd: repoPath })
+      .then(() => execFileAsync("bun", ["run", "build"], { cwd: repoPath }))
+      .finally(() => {
+        buildPromise = null;
+      });
   }
   await buildPromise;
 }
