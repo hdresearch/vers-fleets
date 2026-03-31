@@ -6,7 +6,7 @@ import { buildGolden, buildRoot, provisionFleet } from "./orchestrate.js";
 
 function checkPrerequisites() {
   const missing = [];
-  for (const bin of ["ssh", "openssl"]) {
+  for (const bin of ["ssh", "openssl", "git", "tar", "ssh-keygen"]) {
     try {
       execFileSync(bin, ["--help"], { stdio: "ignore" });
     } catch (e) {
@@ -17,13 +17,28 @@ function checkPrerequisites() {
     console.error(`Error: missing required tools: ${missing.join(", ")}`);
     if (process.platform === "win32") {
       console.error(`
-On Windows, install these via one of:
-  - Git for Windows (includes both ssh and openssl): https://git-scm.com/download/win
-  - OpenSSH Client: Settings > Apps > Optional Features > OpenSSH Client
-  - winget: winget install Git.Git
-After installing, restart your terminal so PATH is updated.`);
+On Windows, install these via:
+  - Git for Windows (includes ssh, ssh-keygen, openssl, git, tar):
+      https://git-scm.com/download/win  (or: winget install Git.Git)
+    After installing, ensure these directories are in your PATH:
+      C:\\Program Files\\Git\\usr\\bin    (ssh, ssh-keygen, tar)
+      C:\\Program Files\\Git\\mingw64\\bin (openssl)
+    The Git installer only adds Git\\cmd by default — openssl requires mingw64\\bin.
+  - Alternatively, run this tool from Git Bash where PATH is pre-configured.`);
     }
     process.exit(1);
+  }
+
+  if (process.platform === "win32") {
+    try {
+      const sshPath = execFileSync("where.exe", ["ssh"], { encoding: "utf8" }).split("\n")[0].trim();
+      if (sshPath.toLowerCase().includes("system32")) {
+        console.warn(`[vers-fleets] Warning: Windows native ssh.exe detected at ${sshPath}`);
+        console.warn(`  The Vers ProxyCommand requires Git for Windows ssh, not Windows OpenSSH.`);
+        console.warn(`  Ensure C:\\Program Files\\Git\\usr\\bin appears before C:\\Windows\\System32\\OpenSSH in your PATH,`);
+        console.warn(`  or run this tool from Git Bash.`);
+      }
+    } catch { /* where.exe unavailable or ssh not in PATH — already caught above */ }
   }
 }
 
