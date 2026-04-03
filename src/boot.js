@@ -28,7 +28,7 @@ export function buildRuntimeEnv(vm, topology, options = {}) {
       ? shellQuote(options.anthropicApiKey)
       : process.env.ANTHROPIC_API_KEY
         ? shellQuote(process.env.ANTHROPIC_API_KEY)
-        : llmProxyKey;
+        : "";
   const env = {
     PORT: "3000",
     VERS_VM_ID: vm.vmId,

@@ -123,7 +123,7 @@ test("buildRuntimeScript injects secrets and starts reef", () => {
     assert.match(script, /VERS_API_KEY='vers-key'/);
     assert.match(script, /VERS_AUTH_TOKEN='auth-token'/);
     assert.match(script, /LLM_PROXY_KEY='sk-vers-proxy'/);
-    assert.match(script, /ANTHROPIC_API_KEY='sk-vers-proxy'/);
+    assert.doesNotMatch(script, /ANTHROPIC_API_KEY=/);
     assert.match(script, /VERS_GOLDEN_COMMIT_ID='golden-abc-123'/);
     assert.match(script, /bun run src\/main\.ts/);
     assert.match(script, /reef is healthy/);
