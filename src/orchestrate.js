@@ -340,6 +340,7 @@ export async function buildGolden(input = {}, options = {}) {
     vcpu_count: 2,
     mem_size_mib: 4096,
     fs_size_mib: 8192,
+    kernel_name: "default.bin",
   };
 
   const vmConfig = input.vmConfig || DEFAULT_GOLDEN_VM_CONFIG;

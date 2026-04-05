@@ -8,6 +8,7 @@ function defaultRootVmConfig() {
     vcpu_count: 2,
     mem_size_mib: 4096,
     fs_size_mib: 8192,
+    kernel_name: "default.bin",
   };
 }
 
@@ -62,6 +63,12 @@ function normalizeVmConfig(value, fieldName, fallback) {
       throw new Error(`${fieldName}.${key} must be a positive integer`);
     }
   }
+
+  // Pass through optional string fields (kernel_name, image_name)
+  const kernel = source.kernel_name ?? fallback.kernel_name;
+  if (kernel) config.kernel_name = kernel;
+  const image = source.image_name ?? fallback.image_name;
+  if (image) config.image_name = image;
 
   return config;
 }
