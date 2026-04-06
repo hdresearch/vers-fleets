@@ -191,29 +191,26 @@ async function registerRootFleetRecords(topology, authToken, fetchImpl = fetch) 
   await apiRequest(rootBaseUrl, authToken, "PATCH", `/vm-tree/vms/${encodeURIComponent(topology.root.vmId)}`, {
     name: topology.root.name,
     category: topology.root.category,
+    status: "running",
+    address: `${topology.root.vmId}.vm.vers.sh`,
+    lastHeartbeat: Date.now(),
     reefConfig: topology.root.reefConfig,
   }, fetchImpl).catch(async () => {
     await apiRequest(rootBaseUrl, authToken, "POST", "/vm-tree/vms", {
       vmId: topology.root.vmId,
       name: topology.root.name,
       category: topology.root.category,
+      status: "running",
+      address: `${topology.root.vmId}.vm.vers.sh`,
+      lastHeartbeat: Date.now(),
       reefConfig: topology.root.reefConfig,
     }, fetchImpl);
+  await apiRequest(rootBaseUrl, authToken, "PATCH", `/vm-tree/vms/${encodeURIComponent(topology.root.vmId)}`, {
+      status: "running",
+      address: `${topology.root.vmId}.vm.vers.sh`,
+      lastHeartbeat: Date.now(),
+    }, fetchImpl);
   });
-
-  await apiRequest(rootBaseUrl, authToken, "POST", "/registry/vms", {
-    id: topology.root.vmId,
-    name: topology.root.name,
-    role: "infra",
-    address: `${topology.root.vmId}.vm.vers.sh`,
-    reefConfig: topology.root.reefConfig,
-    registeredBy: "vers-fleets",
-    metadata: {
-      category: topology.root.category,
-      publicUrl: rootBaseUrl,
-      sqliteAuthority: true,
-    },
-  }, fetchImpl);
 }
 
 function writeDeployment(outDir, deployment) {

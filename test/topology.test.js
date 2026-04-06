@@ -23,9 +23,11 @@ test("buildTopology creates root-only sqlite authority topology", () => {
   assert.equal(topology.profiles.rootAuthorityOverlay.capabilities.includes("sqlite-authority"), true);
   assert.equal(topology.root.runtime.hasSqliteAuthority, true);
   assert.equal(topology.root.runtime.profile, "root-with-authority-overlay");
-  assert.equal(topology.root.reefConfig.services.includes("registry"), true);
   assert.equal(topology.root.reefConfig.services.includes("vm-tree"), true);
   assert.equal(topology.root.reefConfig.services.includes("store"), true);
+  assert.equal(topology.root.reefConfig.services.includes("scheduled"), true);
+  assert.equal(topology.root.reefConfig.services.includes("usage"), true);
+  assert.equal(topology.root.reefConfig.services.includes("probe"), true);
   assert.equal(topology.root.reefConfig.services.includes("commits"), true);
   assert.equal(topology.lieutenant, null);
   assert.deepEqual(topology.swarm, []);
@@ -73,6 +75,23 @@ test("buildBootstrapBundle can inline runtime secrets for remote bootstrap", () 
   assert.match(bundle.scripts.root, /LLM_PROXY_KEY='sk-vers-secret'/);
 });
 
+test("buildBootstrapBundle does not export anthropic keys", () => {
+  const bundle = buildBootstrapBundle(
+    {
+      rootName: "reef-root",
+    },
+    {
+      rootUrl: "https://infra.vm.vers.sh:3000",
+      versApiKey: "vers-secret",
+      versAuthToken: "auth-secret",
+      llmProxyKey: "sk-vers-secret",
+    },
+  );
+
+  assert.match(bundle.scripts.root, /LLM_PROXY_KEY='sk-vers-secret'/);
+  assert.doesNotMatch(bundle.scripts.root, /ANTHROPIC_API_KEY=/);
+});
+
 test("buildImageScript produces a secret-free image build script", () => {
   const topology = buildTopology({ rootName: "reef-root" });
   const script = buildImageScript(topology);
@@ -89,6 +108,34 @@ test("buildImageScript produces a secret-free image build script", () => {
 });
 
 test("buildRuntimeScript injects secrets and starts reef", () => {
+  const originalAnthropicKey = process.env.ANTHROPIC_API_KEY;
+  delete process.env.ANTHROPIC_API_KEY;
+  const topology = buildTopology({ rootName: "reef-root", rootVmId: "vm-1" });
+  try {
+    const script = buildRuntimeScript(topology.root, topology, {
+      versApiKey: "vers-key",
+      versAuthToken: "auth-token",
+      llmProxyKey: "sk-vers-proxy",
+      goldenCommitId: "golden-abc-123",
+    });
+    assert.match(script, /configuring runtime for reef-root/);
+    assert.match(script, /VERS_API_KEY='vers-key'/);
+    assert.match(script, /VERS_AUTH_TOKEN='auth-token'/);
+    assert.match(script, /LLM_PROXY_KEY='sk-vers-proxy'/);
+    assert.doesNotMatch(script, /ANTHROPIC_API_KEY=/);
+    assert.match(script, /VERS_GOLDEN_COMMIT_ID='golden-abc-123'/);
+    assert.match(script, /bun run src\/main\.ts/);
+    assert.match(script, /reef is healthy/);
+  } finally {
+    if (originalAnthropicKey === undefined) {
+      delete process.env.ANTHROPIC_API_KEY;
+    } else {
+      process.env.ANTHROPIC_API_KEY = originalAnthropicKey;
+    }
+  }
+});
+
+test("buildRuntimeScript does not export anthropic keys", () => {
   const topology = buildTopology({ rootName: "reef-root", rootVmId: "vm-1" });
   const script = buildRuntimeScript(topology.root, topology, {
     versApiKey: "vers-key",
@@ -96,11 +143,8 @@ test("buildRuntimeScript injects secrets and starts reef", () => {
     llmProxyKey: "sk-vers-proxy",
     goldenCommitId: "golden-abc-123",
   });
-  assert.match(script, /configuring runtime for reef-root/);
-  assert.match(script, /VERS_API_KEY='vers-key'/);
-  assert.match(script, /VERS_AUTH_TOKEN='auth-token'/);
+
   assert.match(script, /LLM_PROXY_KEY='sk-vers-proxy'/);
-  assert.match(script, /VERS_GOLDEN_COMMIT_ID='golden-abc-123'/);
-  assert.match(script, /bun run src\/main\.ts/);
-  assert.match(script, /reef is healthy/);
+  assert.doesNotMatch(script, /ANTHROPIC_API_KEY=/);
+  assert.doesNotMatch(script, /REEF_MODEL_PROVIDER=/);
 });
