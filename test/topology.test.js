@@ -75,7 +75,7 @@ test("buildBootstrapBundle can inline runtime secrets for remote bootstrap", () 
   assert.match(bundle.scripts.root, /LLM_PROXY_KEY='sk-vers-secret'/);
 });
 
-test("buildBootstrapBundle prefers a dedicated secondary provider key when provided", () => {
+test("buildBootstrapBundle does not export anthropic keys", () => {
   const bundle = buildBootstrapBundle(
     {
       rootName: "reef-root",
@@ -85,12 +85,11 @@ test("buildBootstrapBundle prefers a dedicated secondary provider key when provi
       versApiKey: "vers-secret",
       versAuthToken: "auth-secret",
       llmProxyKey: "sk-vers-secret",
-      anthropicApiKey: "sk-ant-secret",
     },
   );
 
   assert.match(bundle.scripts.root, /LLM_PROXY_KEY='sk-vers-secret'/);
-  assert.match(bundle.scripts.root, /ANTHROPIC_API_KEY='sk-ant-secret'/);
+  assert.doesNotMatch(bundle.scripts.root, /ANTHROPIC_API_KEY=/);
 });
 
 test("buildImageScript produces a secret-free image build script", () => {
@@ -136,16 +135,16 @@ test("buildRuntimeScript injects secrets and starts reef", () => {
   }
 });
 
-test("buildRuntimeScript prefers a dedicated secondary provider key", () => {
+test("buildRuntimeScript does not export anthropic keys", () => {
   const topology = buildTopology({ rootName: "reef-root", rootVmId: "vm-1" });
   const script = buildRuntimeScript(topology.root, topology, {
     versApiKey: "vers-key",
     versAuthToken: "auth-token",
     llmProxyKey: "sk-vers-proxy",
-    anthropicApiKey: "sk-ant-secret",
     goldenCommitId: "golden-abc-123",
   });
 
   assert.match(script, /LLM_PROXY_KEY='sk-vers-proxy'/);
-  assert.match(script, /ANTHROPIC_API_KEY='sk-ant-secret'/);
+  assert.doesNotMatch(script, /ANTHROPIC_API_KEY=/);
+  assert.doesNotMatch(script, /REEF_MODEL_PROVIDER=/);
 });

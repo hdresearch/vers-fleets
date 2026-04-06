@@ -454,7 +454,6 @@ export async function provisionFleet(input = {}, options = {}) {
       versApiKey: auth.apiKey,
       versAuthToken: authToken,
       llmProxyKey: llmProxy.key,
-      anthropicApiKey: options.anthropicApiKey || process.env.ANTHROPIC_API_KEY,
       rootCommitId,
       goldenCommitId,
     });
@@ -472,7 +471,6 @@ export async function provisionFleet(input = {}, options = {}) {
         versApiKey: auth.apiKey,
         versAuthToken: authToken,
         llmProxyKey: llmProxy.key,
-        anthropicApiKey: options.anthropicApiKey || process.env.ANTHROPIC_API_KEY,
         goldenCommitId,
       },
     );

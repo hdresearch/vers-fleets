@@ -23,12 +23,6 @@ export function buildRuntimeEnv(vm, topology, options = {}) {
       : process.env.LLM_PROXY_KEY
         ? shellQuote(process.env.LLM_PROXY_KEY)
         : "";
-  const anthropicApiKey =
-    options.anthropicApiKey && String(options.anthropicApiKey).trim()
-      ? shellQuote(options.anthropicApiKey)
-      : process.env.ANTHROPIC_API_KEY
-        ? shellQuote(process.env.ANTHROPIC_API_KEY)
-        : "";
   const env = {
     PORT: "3000",
     VERS_VM_ID: vm.vmId,
@@ -44,14 +38,6 @@ export function buildRuntimeEnv(vm, topology, options = {}) {
         : `\${${topology.env.versAuthTokenEnv}:-}`,
     VERS_INFRA_URL: shellQuote(rootUrl),
     LLM_PROXY_KEY: llmProxyKey,
-    // Optional secondary provider key for internal runtime failover.
-    ANTHROPIC_API_KEY: anthropicApiKey,
-    REEF_MODEL_PROVIDER:
-      options.modelProvider && String(options.modelProvider).trim()
-        ? shellQuote(options.modelProvider)
-        : process.env.REEF_MODEL_PROVIDER
-          ? shellQuote(process.env.REEF_MODEL_PROVIDER)
-          : "",
     REEF_ROLE: vm.runtime.reefRole,
     REEF_CATEGORY: vm.category,
     REEF_PARENT_VM_ID: vm.parentVmId || "",
