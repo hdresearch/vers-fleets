@@ -1,7 +1,46 @@
 #!/usr/bin/env bun
 
 import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import { buildGolden, buildRoot, provisionFleet } from "./orchestrate.js";
+
+function checkPrerequisites() {
+  const missing = [];
+  for (const bin of ["ssh", "openssl", "git", "tar", "ssh-keygen"]) {
+    try {
+      execFileSync(bin, ["--help"], { stdio: "ignore" });
+    } catch (e) {
+      if (e.code === "ENOENT") missing.push(bin);
+    }
+  }
+  if (missing.length > 0) {
+    console.error(`Error: missing required tools: ${missing.join(", ")}`);
+    if (process.platform === "win32") {
+      console.error(`
+On Windows, install these via:
+  - Git for Windows (includes ssh, ssh-keygen, openssl, git, tar):
+      https://git-scm.com/download/win  (or: winget install Git.Git)
+    After installing, ensure these directories are in your PATH:
+      C:\\Program Files\\Git\\usr\\bin    (ssh, ssh-keygen, tar)
+      C:\\Program Files\\Git\\mingw64\\bin (openssl)
+    The Git installer only adds Git\\cmd by default — openssl requires mingw64\\bin.
+  - Alternatively, run this tool from Git Bash where PATH is pre-configured.`);
+    }
+    process.exit(1);
+  }
+
+  if (process.platform === "win32") {
+    try {
+      const sshPath = execFileSync("where.exe", ["ssh"], { encoding: "utf8" }).split("\n")[0].trim();
+      if (sshPath.toLowerCase().includes("system32")) {
+        console.warn(`[vers-fleets] Warning: Windows native ssh.exe detected at ${sshPath}`);
+        console.warn(`  The Vers ProxyCommand requires Git for Windows ssh, not Windows OpenSSH.`);
+        console.warn(`  Ensure C:\\Program Files\\Git\\usr\\bin appears before C:\\Windows\\System32\\OpenSSH in your PATH,`);
+        console.warn(`  or run this tool from Git Bash.`);
+      }
+    } catch { /* where.exe unavailable or ssh not in PATH — already caught above */ }
+  }
+}
 
 function parseArgs(argv) {
   const args = {
@@ -141,6 +180,7 @@ async function main() {
   }
 
   if (args.command === "build-root") {
+    checkPrerequisites();
     requireAuth(args);
     if (!args.visibility) {
       console.error("Error: --public or --private is required for build-root.");
@@ -182,6 +222,7 @@ async function main() {
   }
 
   if (args.command === "build-golden") {
+    checkPrerequisites();
     requireAuth(args);
     if (!args.visibility) {
       console.error("Error: --public or --private is required for build-golden.");
@@ -223,7 +264,11 @@ async function main() {
   }
 
   if (args.command === "provision") {
+    checkPrerequisites();
     requireAuth(args);
+    if (args.email && (!process.env.VERS_API_KEY || args.forceShellAuth)) {
+      console.log(`[vers-fleets] A magic link will be sent to ${args.email} — check your inbox (and spam) and click it to authenticate.`);
+    }
     if (!args.rootCommitId) {
       console.error("Error: --root-commit is required for provision.");
       process.exit(1);

@@ -7,6 +7,7 @@
     "@hdresearch/pi-v": "github:hdresearch/pi-vers#main"
   },
   "scripts": {
+    "postinstall": "bun install --cwd node_modules/@hdresearch/pi-v && bun scripts/patch-pi-v.js",
     "test": "node --test",
     "build": "node --check src/topology.js && node --check src/boot.js && node --check src/pi-vers.js && node --check src/orchestrate.js && node --check src/cli.js"
   }

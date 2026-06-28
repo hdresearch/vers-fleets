@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { spawn, execFile } from "node:child_process";
 import { mkdtempSync, rmSync } from "node:fs";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resolve } from "node:path";
 import { buildBootstrapBundle, buildImageScript, buildGoldenImageScript, buildRuntimeScript, buildRuntimeEnv } from "./boot.js";
@@ -131,7 +132,7 @@ async function materializeWorkspaceSource(source) {
     };
   }
 
-  const tempRoot = mkdtempSync(join(process.cwd(), ".vers-fleets-stage-"));
+  const tempRoot = mkdtempSync(join(tmpdir(), "vers-fleets-stage-"));
   await new Promise((resolvePromise, reject) => {
     const archive = spawn("git", ["archive", source.ref], {
       cwd: localPath,
